@@ -25,32 +25,32 @@ function Modal({ isOpen, onClose, title, children }: ModalProps) {
             onClick={onClose}
             className="absolute inset-0 bg-black/80 backdrop-blur-xl"
           />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 40 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 40 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-xl bg-white/5 dark:bg-zinc-900/50 backdrop-blur-3xl border border-white/10 dark:border-zinc-800/50 rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden"
-          >
-            <div className="px-10 py-8 border-b border-white/5 dark:border-zinc-800/50 flex items-center justify-between">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="w-3 h-3 text-indigo-400" />
-                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Protocol</span>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-xl bg-black border border-white/10 rounded-[3rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden"
+            >
+              <div className="px-10 py-10 border-b border-white/5 flex items-center justify-between bg-gradient-to-b from-white/[0.02] to-transparent">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-3 h-3 text-orange-500" />
+                    <span className="text-[10px] font-black text-orange-500/50 uppercase tracking-[0.4em]">Protocol Alpha</span>
+                  </div>
+                  <h2 className="text-3xl font-black font-space-grotesk tracking-tight text-white">{title}</h2>
                 </div>
-                <h2 className="text-2xl font-black font-space-grotesk tracking-tight text-zinc-900 dark:text-white">{title}</h2>
+                <button 
+                  onClick={onClose} 
+                  className="w-14 h-14 flex items-center justify-center bg-white/5 rounded-[1.25rem] hover:scale-110 active:scale-95 transition-all text-zinc-500 hover:text-white border border-white/5"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <button 
-                onClick={onClose} 
-                className="w-12 h-12 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl hover:scale-110 active:scale-95 transition-all text-zinc-400 hover:text-red-500"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-10">
-              {children}
-            </div>
-          </motion.div>
+              <div className="p-10">
+                {children}
+              </div>
+            </motion.div>
         </div>
       )}
     </AnimatePresence>

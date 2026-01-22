@@ -127,41 +127,100 @@ export default function Dashboard() {
     }
   };
 
-  const filteredBookmarks = bookmarks.filter(b => {
-    const matchesSearch = b.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         b.url.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         b.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (selectedContainerId === 'favorites') return b.is_favorite && matchesSearch;
-    if (selectedContainerId) return b.container_id === selectedContainerId && matchesSearch;
-    return matchesSearch;
-  });
+    const isToday = (date: string) => {
+      const today = new Date();
+      const d = new Date(date);
+      return d.getDate() === today.getDate() &&
+             d.getMonth() === today.getMonth() &&
+             d.getFullYear() === today.getFullYear();
+    };
 
-  const selectedContainerName = selectedContainerId === 'favorites' 
-    ? 'Favorites' 
-    : containers.find(c => c.id === selectedContainerId)?.name || 'All Bookmarks';
+    const filteredBookmarks = bookmarks.filter(b => {
+      const matchesSearch = b.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           b.url.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           b.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
 
-  if (!user) return null;
+      if (selectedContainerId === 'favorites') return b.is_favorite;
+      if (selectedContainerId === 'today') return isToday(b.created_at);
+      if (selectedContainerId === 'shortcuts') return b.tags?.includes('shortcut');
+      if (selectedContainerId === 'settings') return false; // Settings view handled separately
+      if (selectedContainerId) return b.container_id === selectedContainerId;
+      return true;
+    });
 
-  return (
-    <div className="flex min-h-screen bg-transparent text-zinc-900 dark:text-zinc-100 font-sans">
-      <Sidebar 
-        containers={containers} 
-        selectedContainerId={selectedContainerId}
-        onSelectContainer={setSelectedContainerId}
-        onAddContainer={() => setIsAddContainerOpen(true)}
-      />
+    const getSelectedName = () => {
+      if (selectedContainerId === 'favorites') return 'Curated Collection';
+      if (selectedContainerId === 'today') return 'Captured Today';
+      if (selectedContainerId === 'shortcuts') return 'Active Shortcuts';
+      if (selectedContainerId === 'settings') return 'System Settings';
+      return containers.find(c => c.id === selectedContainerId)?.name || 'Global Discovery';
+    };
 
-      <main className="flex-1 flex flex-col min-w-0">
-        <Header 
-          onAddBookmark={() => setIsAddBookmarkOpen(true)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          containerName={selectedContainerName}
+    const selectedContainerName = getSelectedName();
+
+    if (!user) return null;
+
+    return (
+      <div className="flex min-h-screen bg-black text-zinc-100 font-sans relative overflow-hidden">
+        {/* God-level Dashboard Background */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-orange-500/5 blur-[150px] rounded-full animate-pulse" />
+          <div className="absolute -top-24 -left-24 w-[600px] h-[600px] bg-orange-600/5 blur-[120px] rounded-full" />
+        </div>
+
+        <Sidebar 
+          containers={containers} 
+          selectedContainerId={selectedContainerId}
+          onSelectContainer={setSelectedContainerId}
+          onAddContainer={() => setIsAddContainerOpen(true)}
         />
 
-        <div className="flex-1 p-8 lg:p-12">
-          {loading ? (
+        <main className="flex-1 flex flex-col min-w-0 relative z-10">
+          <Header 
+            onAddBookmark={() => setIsAddBookmarkOpen(true)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            containerName={selectedContainerName}
+          />
+
+          <div className="flex-1 p-8 lg:p-12 overflow-y-auto custom-scrollbar">
+            {selectedContainerId === 'settings' ? (
+              <div className="max-w-4xl mx-auto py-20">
+                <div className="flex items-center gap-6 mb-16">
+                  <div className="w-20 h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center shadow-2xl">
+                    <Settings className="w-10 h-10 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-5xl font-black font-space-grotesk tracking-tighter">Settings</h2>
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs mt-2">Manage your high-res workspace</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-8">
+                  <div className="p-10 bg-white/5 border border-white/5 rounded-[3rem] backdrop-blur-3xl">
+                    <h3 className="text-2xl font-black font-space-grotesk mb-6">Profile Configuration</h3>
+                    <div className="flex items-center gap-6 p-6 bg-black/40 rounded-2xl border border-white/5">
+                      <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-2xl font-black">
+                        {user.email?.[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-black text-white">{user.email}</p>
+                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">Authenticated via Supabase</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
+                    className="w-full p-8 bg-red-500/10 border border-red-500/20 rounded-[3rem] text-red-500 font-black text-xl hover:bg-red-500 hover:text-white transition-all"
+                  >
+                    Terminate Session
+                  </button>
+                </div>
+              </div>
+            ) : loading ? (
             <div className="h-full flex flex-col items-center justify-center text-zinc-400">
               <Loader2 className="w-8 h-8 animate-spin mb-4" />
               <p className="text-sm font-medium">Loading your Cognify hub...</p>

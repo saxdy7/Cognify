@@ -17,40 +17,40 @@ export const LandingNavbar = () => {
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-4' : 'py-8'}`}>
-      <div className="max-w-7xl mx-auto px-6">
-        <div className={`relative flex items-center justify-between px-8 py-4 rounded-3xl transition-all duration-500 ${scrolled ? 'bg-white/70 dark:bg-black/70 backdrop-blur-2xl shadow-2xl border border-white/20 dark:border-white/10' : 'bg-transparent'}`}>
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-black dark:bg-white rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12">
-              <Sparkles className="w-6 h-6 text-white dark:text-black" />
+        <div className="max-w-7xl mx-auto px-6">
+          <div className={`relative flex items-center justify-between px-8 py-4 rounded-3xl transition-all duration-500 ${scrolled ? 'bg-black/80 dark:bg-black/80 backdrop-blur-2xl shadow-2xl border border-white/10' : 'bg-transparent'}`}>
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12 shadow-[0_0_20px_rgba(249,115,22,0.4)]">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-xl font-black font-space-grotesk tracking-tight text-white">Cognify</span>
+            </Link>
+
+            <div className="hidden md:flex items-center gap-10">
+              {['Features', 'Testimonials', 'Pricing', 'FAQ'].map((item) => (
+                <Link 
+                  key={item} 
+                  href={`#${item.toLowerCase()}`}
+                  className="text-sm font-black uppercase tracking-widest text-zinc-400 hover:text-orange-400 transition-colors"
+                >
+                  {item}
+                </Link>
+              ))}
             </div>
-            <span className="text-xl font-bold font-space-grotesk tracking-tight">Cognify</span>
-          </Link>
 
-          <div className="hidden md:flex items-center gap-10">
-            {['Features', 'Testimonials', 'Pricing', 'FAQ'].map((item) => (
+            <div className="flex items-center gap-4">
               <Link 
-                key={item} 
-                href={`#${item.toLowerCase()}`}
-                className="text-sm font-medium text-zinc-500 hover:text-black dark:hover:text-white transition-colors"
+                href="/login"
+                className="hidden sm:block text-sm font-black uppercase tracking-widest text-white px-6 py-3 hover:bg-white/10 rounded-2xl transition-all"
               >
-                {item}
+                Sign In
               </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/login"
-              className="hidden sm:block text-sm font-bold px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-2xl transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link 
-              href="/login?mode=signup"
-              className="text-sm font-bold px-8 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl hover:scale-105 transition-transform shadow-xl active:scale-95"
-            >
-              Get Started
-            </Link>
+              <Link 
+                href="/login?mode=signup"
+                className="text-sm font-black uppercase tracking-widest px-8 py-3 bg-white text-black rounded-2xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-95"
+              >
+                Get Started
+              </Link>
             <button 
               className="md:hidden p-2"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
