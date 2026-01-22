@@ -34,23 +34,26 @@ export async function POST(request: Request) {
     const domain = validUrl.hostname;
 
     // Smart Logo Detection
-    let logo_url = metadata.ogImage?.[0]?.url || metadata.favicon;
-    
+    const ogImage = Array.isArray(metadata.ogImage) ? metadata.ogImage[0] : metadata.ogImage;
+    const ogImageUrl = typeof ogImage === 'object' ? ogImage?.url : ogImage;
+
+    let logo_url = ogImageUrl || metadata.favicon;
+
     // Fallback to Clearbit for cleaner brand logos if it's a root domain
     if (!logo_url || logo_url.includes('favicon.ico')) {
-        logo_url = `https://logo.clearbit.com/${domain}`;
+      logo_url = `https://logo.clearbit.com/${domain}`;
     }
 
     // Final fallback to Google Favicon API
     if (!logo_url) {
-        logo_url = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+      logo_url = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
     }
 
     const result = {
       title: metadata.ogTitle || metadata.twitterTitle || domain,
       description: metadata.ogDescription || metadata.twitterDescription || '',
       logo_url,
-      preview_image_url: metadata.ogImage?.[0]?.url || '',
+      preview_image_url: ogImageUrl || '',
       category: detectCategory(metadata),
       tags: generateTags(metadata),
       domain,
