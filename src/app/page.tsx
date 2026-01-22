@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { BookmarkCard } from '@/components/BookmarkCard';
+import { MasonryGrid } from '@/components/MasonryGrid';
+import { MicroExpander } from '@/components/MicroExpander';
 import { AddBookmarkModal, AddContainerModal } from '@/components/Modals';
 import { supabase } from '@/lib/supabase';
 import { Bookmark, Container } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Sparkles } from 'lucide-react';
 
 const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -126,7 +128,7 @@ export default function Dashboard() {
     : containers.find(c => c.id === selectedContainerId)?.name || 'All Bookmarks';
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans">
+    <div className="flex min-h-screen bg-transparent text-zinc-900 dark:text-zinc-100 font-sans">
       <Sidebar 
         containers={containers} 
         selectedContainerId={selectedContainerId}
@@ -134,7 +136,7 @@ export default function Dashboard() {
         onAddContainer={() => setIsAddContainerOpen(true)}
       />
 
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0">
         <Header 
           onAddBookmark={() => setIsAddBookmarkOpen(true)}
           searchQuery={searchQuery}
@@ -142,49 +144,67 @@ export default function Dashboard() {
           containerName={selectedContainerName}
         />
 
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-8 lg:p-12">
           {loading ? (
             <div className="h-full flex flex-col items-center justify-center text-zinc-400">
               <Loader2 className="w-8 h-8 animate-spin mb-4" />
-              <p className="text-sm font-medium">Loading your knowledge hub...</p>
+              <p className="text-sm font-medium">Loading your Cognify hub...</p>
             </div>
           ) : filteredBookmarks.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <AnimatePresence mode="popLayout">
-                {filteredBookmarks.map((bookmark) => (
-                  <BookmarkCard 
-                    key={bookmark.id} 
-                    bookmark={bookmark} 
-                    onEdit={() => {}} 
-                    onDelete={handleDeleteBookmark}
-                    onToggleFavorite={handleToggleFavorite}
-                  />
-                ))}
-              </AnimatePresence>
+            <div className="max-w-[2000px] mx-auto">
+              <MasonryGrid>
+                <AnimatePresence mode="popLayout">
+                  {filteredBookmarks.map((bookmark, index) => (
+                    <motion.div
+                      key={bookmark.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <BookmarkCard 
+                        bookmark={bookmark} 
+                        onEdit={() => {}} 
+                        onDelete={handleDeleteBookmark}
+                        onToggleFavorite={handleToggleFavorite}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </MasonryGrid>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
-              <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-6">
-                <Plus className="w-10 h-10 text-zinc-400" />
+              <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-8 shadow-inner">
+                <Sparkles className="w-10 h-10 text-zinc-400" />
               </div>
-              <h2 className="text-xl font-bold mb-2">No bookmarks found</h2>
-              <p className="text-zinc-500 mb-8">
+              <h2 className="text-2xl font-bold mb-3 font-space-grotesk">No inspiration yet</h2>
+              <p className="text-zinc-500 mb-10 leading-relaxed">
                 {searchQuery 
-                  ? "We couldn't find anything matching your search. Try a different keyword." 
-                  : "Start building your personal knowledge hub by adding your first bookmark."}
+                  ? "We couldn't find anything matching your search. Try a broader term." 
+                  : "Start building your God-level knowledge hub by adding your first resource."}
               </p>
               {!searchQuery && (
                 <button
                   onClick={() => setIsAddBookmarkOpen(true)}
-                  className="px-6 py-3 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold hover:opacity-90 transition-opacity"
+                  className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl active:scale-95"
                 >
-                  Add Your First Link
+                  Create Bookmark
                 </button>
               )}
             </div>
           )}
         </div>
       </main>
+
+      <MicroExpander 
+        onAddBookmark={() => setIsAddBookmarkOpen(true)}
+        onAddContainer={() => setIsAddContainerOpen(true)}
+        onSearch={() => {
+          const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+          input?.focus();
+        }}
+        onToggleFavorites={() => setSelectedContainerId(selectedContainerId === 'favorites' ? null : 'favorites')}
+      />
 
       <AddBookmarkModal 
         isOpen={isAddBookmarkOpen} 
