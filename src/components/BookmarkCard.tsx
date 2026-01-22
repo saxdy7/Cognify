@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ExternalLink, Star, Trash2, Sparkles, Zap } from 'lucide-react';
+import { ExternalLink, Star, Trash2, Sparkles, Zap, Command } from 'lucide-react';
 import { Bookmark } from '@/types';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -11,10 +11,12 @@ interface BookmarkCardProps {
   onEdit: (bookmark: Bookmark) => void;
   onDelete: (id: string) => void;
   onToggleFavorite: (bookmark: Bookmark) => void;
+  onToggleShortcut?: (bookmark: Bookmark) => void;
 }
 
-export function BookmarkCard({ bookmark, onEdit, onDelete, onToggleFavorite }: BookmarkCardProps) {
+export function BookmarkCard({ bookmark, onEdit, onDelete, onToggleFavorite, onToggleShortcut }: BookmarkCardProps) {
   const domain = new URL(bookmark.url).hostname;
+  const isShortcut = bookmark.tags?.includes('shortcut');
   // Using a more reliable screenshot service or a placeholder if needed
   const previewUrl = `https://api.microlink.io/?url=${encodeURIComponent(bookmark.url)}&screenshot=true&embed=screenshot.url`;
 
@@ -29,6 +31,17 @@ export function BookmarkCard({ bookmark, onEdit, onDelete, onToggleFavorite }: B
     >
       {/* Action Buttons - Pinterest Style Overlay */}
       <div className="absolute top-6 right-6 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
+        <button 
+          onClick={(e) => { e.preventDefault(); onToggleShortcut?.(bookmark); }}
+          className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center backdrop-blur-xl border border-white/20 transition-all hover:scale-110 active:scale-95 shadow-2xl",
+            isShortcut 
+              ? "bg-indigo-500 text-white border-indigo-400" 
+              : "bg-white/10 dark:bg-zinc-800/40 text-white"
+          )}
+        >
+          <Command className="w-5 h-5" />
+        </button>
         <button 
           onClick={(e) => { e.preventDefault(); onToggleFavorite(bookmark); }}
           className={cn(

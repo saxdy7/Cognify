@@ -10,7 +10,7 @@ import { AddBookmarkModal, AddContainerModal } from '@/components/Modals';
 import { supabase } from '@/lib/supabase';
 import { Bookmark, Container } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Plus, Sparkles } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
@@ -77,24 +77,26 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddBookmark = async (bookmarkData: any) => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('bookmarks')
-        .insert([{ 
-          ...bookmarkData, 
-          user_id: user.id,
-          tags: bookmarkData.tags || []
-        }])
-        .select();
-      
-      if (error) throw error;
-      if (data) setBookmarks([data[0], ...bookmarks]);
-    } catch (error) {
-      console.error('Error adding bookmark:', error);
-    }
-  };
+    const handleAddBookmark = async (bookmarkData: any) => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('bookmarks')
+          .insert([{ 
+            ...bookmarkData, 
+            user_id: user.id,
+            container_id: bookmarkData.container_id || null,
+            tags: bookmarkData.tags || []
+          }])
+          .select();
+        
+        if (error) throw error;
+        if (data) setBookmarks([data[0], ...bookmarks]);
+      } catch (error) {
+        console.error('Error adding bookmark:', error);
+        alert('Failed to add bookmark. Please try again.');
+      }
+    };
 
   const handleToggleFavorite = async (bookmark: Bookmark) => {
     try {
@@ -109,6 +111,27 @@ export default function Dashboard() {
       ));
     } catch (error) {
       console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleToggleShortcut = async (bookmark: Bookmark) => {
+    try {
+      const tags = bookmark.tags || [];
+      const newTags = tags.includes('shortcut')
+        ? tags.filter(t => t !== 'shortcut')
+        : [...tags, 'shortcut'];
+
+      const { error } = await supabase
+        .from('bookmarks')
+        .update({ tags: newTags })
+        .eq('id', bookmark.id);
+      
+      if (error) throw error;
+      setBookmarks(bookmarks.map(b => 
+        b.id === bookmark.id ? { ...b, tags: newTags } : b
+      ));
+    } catch (error) {
+      console.error('Error toggling shortcut:', error);
     }
   };
 
@@ -188,36 +211,76 @@ export default function Dashboard() {
           <div className="flex-1 p-8 lg:p-12 overflow-y-auto custom-scrollbar">
             {selectedContainerId === 'settings' ? (
               <div className="max-w-4xl mx-auto py-20">
-                <div className="flex items-center gap-6 mb-16">
-                  <div className="w-20 h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center shadow-2xl">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-6 mb-16"
+                >
+                  <div className="w-20 h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_rgba(249,115,22,0.3)]">
                     <Settings className="w-10 h-10 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-5xl font-black font-space-grotesk tracking-tighter">Settings</h2>
-                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs mt-2">Manage your high-res workspace</p>
+                    <h2 className="text-5xl font-black font-space-grotesk tracking-tighter text-white">System Settings</h2>
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] mt-2">Manage your high-res intelligence workspace</p>
                   </div>
-                </div>
+                </motion.div>
                 
-                <div className="space-y-8">
-                  <div className="p-10 bg-white/5 border border-white/5 rounded-[3rem] backdrop-blur-3xl">
-                    <h3 className="text-2xl font-black font-space-grotesk mb-6">Profile Configuration</h3>
-                    <div className="flex items-center gap-6 p-6 bg-black/40 rounded-2xl border border-white/5">
-                      <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-2xl font-black">
+                <div className="grid gap-8">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="p-10 bg-white/5 border border-white/5 rounded-[3rem] backdrop-blur-3xl"
+                  >
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-2xl font-black font-space-grotesk text-white">Profile Configuration</h3>
+                      <div className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-500 uppercase tracking-widest">Active Node</div>
+                    </div>
+                    
+                    <div className="flex items-center gap-8 p-8 bg-black/40 rounded-[2rem] border border-white/5">
+                      <div className="w-24 h-24 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-full flex items-center justify-center text-3xl font-black text-white shadow-2xl">
                         {user.email?.[0].toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-black text-white">{user.email}</p>
-                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">Authenticated via Supabase</p>
+                      <div className="flex-1">
+                        <p className="text-sm font-black text-zinc-500 uppercase tracking-widest mb-1">Identity</p>
+                        <p className="text-2xl font-bold text-white mb-2">{user.email}</p>
+                        <div className="flex items-center gap-4">
+                          <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">UID: {user.id.substring(0, 8)}...</p>
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                          <p className="text-[10px] font-bold text-green-500/80 uppercase tracking-widest">Verified Session</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
 
-                  <button 
-                    onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
-                    className="w-full p-8 bg-red-500/10 border border-red-500/20 rounded-[3rem] text-red-500 font-black text-xl hover:bg-red-500 hover:text-white transition-all"
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="grid grid-cols-2 gap-8"
                   >
-                    Terminate Session
-                  </button>
+                    <div className="p-8 bg-white/5 border border-white/5 rounded-[2.5rem] backdrop-blur-3xl">
+                      <h4 className="text-lg font-black font-space-grotesk text-white mb-4">Workspace Privacy</h4>
+                      <p className="text-sm text-zinc-500 mb-6 leading-relaxed">Your data is encrypted end-to-end. Cognify AI processes metadata locally before sync.</p>
+                      <button className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:bg-white/10 transition-all">Export Local Log</button>
+                    </div>
+                    <div className="p-8 bg-white/5 border border-white/5 rounded-[2.5rem] backdrop-blur-3xl">
+                      <h4 className="text-lg font-black font-space-grotesk text-white mb-4">Neural Preferences</h4>
+                      <p className="text-sm text-zinc-500 mb-6 leading-relaxed">Adjust AI extraction intensity and metadata depth for your resources.</p>
+                      <button className="w-full py-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl text-[10px] font-black text-orange-500 uppercase tracking-widest hover:bg-orange-500/20 transition-all">Configure AI</button>
+                    </div>
+                  </motion.div>
+
+                  <motion.button 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
+                    className="w-full p-8 bg-red-500/5 border border-red-500/10 rounded-[3rem] text-red-500/60 font-black text-xl hover:bg-red-500 hover:text-white transition-all group overflow-hidden relative"
+                  >
+                    <span className="relative z-10">Terminate Current Session</span>
+                    <div className="absolute inset-0 bg-red-500 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                  </motion.button>
                 </div>
               </div>
             ) : loading ? (
@@ -230,19 +293,20 @@ export default function Dashboard() {
               <MasonryGrid>
                 <AnimatePresence mode="popLayout">
                   {filteredBookmarks.map((bookmark, index) => (
-                    <motion.div
-                      key={bookmark.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <BookmarkCard 
-                        bookmark={bookmark} 
-                        onEdit={() => {}} 
-                        onDelete={handleDeleteBookmark}
-                        onToggleFavorite={handleToggleFavorite}
-                      />
-                    </motion.div>
+                      <motion.div
+                        key={bookmark.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <BookmarkCard 
+                          bookmark={bookmark} 
+                          onEdit={() => {}} 
+                          onDelete={handleDeleteBookmark}
+                          onToggleFavorite={handleToggleFavorite}
+                          onToggleShortcut={handleToggleShortcut}
+                        />
+                      </motion.div>
                   ))}
                 </AnimatePresence>
               </MasonryGrid>
