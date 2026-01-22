@@ -26,13 +26,30 @@ export default function LandingPage() {
           <LandingFeatures />
           
           {/* Social Proof / Companies Section */}
-          <section className="py-20 border-y border-zinc-100 dark:border-zinc-900 overflow-hidden">
+          <section className="py-24 border-y border-zinc-100 dark:border-zinc-900 overflow-hidden bg-black/50 backdrop-blur-3xl">
             <div className="container px-6 mx-auto">
-              <p className="text-center text-xs font-bold uppercase tracking-widest text-zinc-400 mb-12">Trusted by builders at</p>
-              <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-40 grayscale">
-                {['Linear', 'Vercel', 'Stripe', 'Supabase', 'Framer'].map((name) => (
-                  <span key={name} className="text-2xl font-bold font-space-grotesk">{name}</span>
-                ))}
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.5em] text-zinc-500 mb-16">Trusted by builders at</p>
+              
+              <div className="relative flex overflow-hidden group">
+                <motion.div 
+                  animate={{ x: [0, -1000] }}
+                  transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                  className="flex items-center gap-24 whitespace-nowrap min-w-full"
+                >
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <React.Fragment key={i}>
+                      {['Linear', 'Vercel', 'Supabase', 'Framer', 'Next.js', 'React'].map((name) => (
+                        <span key={`${i}-${name}`} className="text-4xl md:text-5xl font-black font-space-grotesk text-zinc-800 hover:text-orange-500 transition-colors cursor-default tracking-tighter">
+                          {name}
+                        </span>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </motion.div>
+                
+                {/* Gradient Fades */}
+                <div className="absolute inset-y-0 left-0 w-40 bg-gradient-to-r from-black to-transparent z-10" />
+                <div className="absolute inset-y-0 right-0 w-40 bg-gradient-to-l from-black to-transparent z-10" />
               </div>
             </div>
           </section>

@@ -34,47 +34,42 @@ export const LandingHero = () => {
           <span className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">The Future of Knowledge</span>
         </motion.div>
 
-        <BlurText
-          text="Cognify Your Digital Universe"
-          className="text-6xl md:text-8xl lg:text-[10rem] font-black font-space-grotesk tracking-tighter mb-10 max-w-6xl mx-auto leading-[0.85] text-white"
-          delay={100}
-          animateBy="words"
-          direction="bottom"
-        />
+          <BlurText
+            text="Configure Your Digital Universe"
+            className="text-5xl md:text-7xl lg:text-8xl font-black font-space-grotesk tracking-tighter mb-10 max-w-6xl mx-auto leading-[0.85] text-white"
+            delay={100}
+            animateBy="words"
+            direction="bottom"
+          />
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8, duration: 1 }}
-          className="text-xl md:text-2xl text-zinc-400 max-w-3xl mx-auto mb-16 leading-relaxed font-medium"
-        >
-          Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with AI-powered organization.
-        </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.8 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-8"
-        >
-          <Link
-            href="/login?mode=signup"
-            className="group relative px-12 py-6 bg-orange-500 text-white rounded-2xl font-black text-xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(249,115,22,0.4)]"
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 1 }}
+            className="text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto mb-16 leading-relaxed font-medium"
           >
-            <span className="relative z-10 flex items-center gap-3">
-              Get Started
-              <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
-            </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </Link>
+            Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with AI-powered organization.
+          </motion.p>
 
-          <button className="group flex items-center gap-4 px-12 py-6 bg-white/5 border border-white/10 rounded-2xl font-black text-xl text-white hover:bg-white/10 transition-all backdrop-blur-xl">
-            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Play className="w-5 h-5 fill-orange-500 text-orange-500 ml-1" />
-            </div>
-            Watch Demo
-          </button>
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1, duration: 0.8 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-8"
+          >
+            <Link
+              href="/login?mode=signup"
+              className="group relative px-12 py-6 bg-orange-500 text-white rounded-2xl font-black text-xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_50px_rgba(249,115,22,0.6)]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 animate-gradient-x" />
+              <span className="relative z-10 flex items-center gap-3">
+                Get Started
+                <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+              </span>
+              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
+            </Link>
+          </motion.div>
+
 
         {/* Hero Stats/Social Proof */}
         <motion.div

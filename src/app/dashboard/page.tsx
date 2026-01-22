@@ -12,6 +12,7 @@ import { Bookmark, Container } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Plus, Sparkles, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const [containers, setContainers] = useState<Container[]>([]);
@@ -62,39 +63,56 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddContainer = async (name: string) => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('containers')
-        .insert([{ name, user_id: user.id }])
-        .select();
-      
-      if (error) throw error;
-      if (data) setContainers([data[0], ...containers]);
-    } catch (error) {
-      console.error('Error adding container:', error);
-    }
-  };
+    const handleAddContainer = async (name: string) => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('containers')
+          .insert([{ name, user_id: user.id }])
+          .select();
+        
+        if (error) throw error;
+        if (data) {
+          setContainers([data[0], ...containers]);
+          toast.success('New space initialized successfully');
+        }
+      } catch (error) {
+        console.error('Error adding container:', error);
+        toast.error('Failed to initialize space');
+      }
+    };
 
     const handleAddBookmark = async (bookmarkData: any) => {
       if (!user) return;
       try {
+        // Only include columns that exist in the database
+        const cleanData = {
+          user_id: user.id,
+          url: bookmarkData.url,
+          title: bookmarkData.title,
+          description: bookmarkData.description,
+          logo_url: bookmarkData.logo_url,
+          preview_image_url: bookmarkData.preview_image_url,
+          category: bookmarkData.category,
+          tags: bookmarkData.tags || [],
+          container_id: bookmarkData.container_id || null,
+          metadata_json: bookmarkData.metadata_json,
+          ai_summary: bookmarkData.ai_summary
+        };
+
         const { data, error } = await supabase
           .from('bookmarks')
-          .insert([{ 
-            ...bookmarkData, 
-            user_id: user.id,
-            container_id: bookmarkData.container_id || null,
-            tags: bookmarkData.tags || []
-          }])
+          .insert([cleanData])
           .select();
         
         if (error) throw error;
-        if (data) setBookmarks([data[0], ...bookmarks]);
+        if (data) {
+          setBookmarks([data[0], ...bookmarks]);
+          toast.success('Resource captured to hub');
+        }
       } catch (error) {
         console.error('Error adding bookmark:', error);
-        alert('Failed to add bookmark. Please try again.');
+        toast.error('Failed to capture resource');
       }
     };
 
@@ -109,15 +127,18 @@ export default function Dashboard() {
       setBookmarks(bookmarks.map(b => 
         b.id === bookmark.id ? { ...b, is_favorite: !b.is_favorite } : b
       ));
+      toast.success(bookmark.is_favorite ? 'Removed from curated' : 'Added to curated');
     } catch (error) {
       console.error('Error toggling favorite:', error);
+      toast.error('Failed to update curated status');
     }
   };
 
   const handleToggleShortcut = async (bookmark: Bookmark) => {
     try {
       const tags = bookmark.tags || [];
-      const newTags = tags.includes('shortcut')
+      const isShortcut = tags.includes('shortcut');
+      const newTags = isShortcut
         ? tags.filter(t => t !== 'shortcut')
         : [...tags, 'shortcut'];
 
@@ -130,13 +151,14 @@ export default function Dashboard() {
       setBookmarks(bookmarks.map(b => 
         b.id === bookmark.id ? { ...b, tags: newTags } : b
       ));
+      toast.success(isShortcut ? 'Shortcut deactivated' : 'Shortcut activated');
     } catch (error) {
       console.error('Error toggling shortcut:', error);
+      toast.error('Failed to update shortcut');
     }
   };
 
   const handleDeleteBookmark = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this bookmark?')) return;
     try {
       const { error } = await supabase
         .from('bookmarks')
@@ -145,8 +167,10 @@ export default function Dashboard() {
       
       if (error) throw error;
       setBookmarks(bookmarks.filter(b => b.id !== id));
+      toast.success('Resource purged from hub');
     } catch (error) {
       console.error('Error deleting bookmark:', error);
+      toast.error('Failed to purge resource');
     }
   };
 
@@ -203,6 +227,7 @@ export default function Dashboard() {
         <main className="flex-1 flex flex-col min-w-0 relative z-10">
           <Header 
             onAddBookmark={() => setIsAddBookmarkOpen(true)}
+            onProfileClick={() => setSelectedContainerId('settings')}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             containerName={selectedContainerName}

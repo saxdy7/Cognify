@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { BackgroundBeams } from "@/components/BackgroundBeams";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function RootLayout({
         <div className="relative z-10">
           {children}
         </div>
+        <Toaster position="top-right" theme="dark" richColors />
       </body>
     </html>
   );
