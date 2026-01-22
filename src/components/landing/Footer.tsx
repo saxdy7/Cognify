@@ -29,16 +29,16 @@ export const LandingFooter = () => {
             </div>
           </div>
 
-          <div>
-            <h4 className="text-sm font-bold uppercase tracking-widest mb-8 text-zinc-400">Platform</h4>
-            <ul className="space-y-4">
-              {['Features', 'Integrations', 'Pricing', 'Changelog', 'Roadmap'].map((item) => (
-                <li key={item}>
-                  <Link href="#" className="text-zinc-500 hover:text-black dark:hover:text-white transition-colors">{item}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-widest mb-8 text-zinc-400">Platform</h4>
+              <ul className="space-y-4">
+                {['Features', 'Integrations', 'Changelog', 'Roadmap'].map((item) => (
+                  <li key={item}>
+                    <Link href="#" className="text-zinc-500 hover:text-black dark:hover:text-white transition-colors">{item}</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
           <div>
             <h4 className="text-sm font-bold uppercase tracking-widest mb-8 text-zinc-400">Company</h4>

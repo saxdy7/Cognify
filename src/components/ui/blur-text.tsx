@@ -85,8 +85,26 @@ export const BlurText: React.FC<BlurTextProps> = ({
     }))
   );
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <p ref={ref} className={`blur-text flex flex-wrap ${className}`}>
+        {elements.map((word, index) => (
+          <span key={index} className="inline-block">
+            {word === ' ' ? '\u00A0' : word}
+            {animateBy === 'words' && index < elements.length - 1 && '\u00A0'}
+          </span>
+        ))}
+      </p>
+    );
+  }
+
   return (
-    <p ref={ref} className={`blur-text flex flex-wrap ${className}`}>
+    <p ref={ref} className={`blur-text flex flex-wrap ${className}`} suppressHydrationWarning>
       {springs.map((props, index) => (
         <animated.span
           key={index}

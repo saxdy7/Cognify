@@ -36,7 +36,7 @@ export const LandingHero = () => {
 
           <BlurText
             text="Configure Your Digital Universe"
-            className="text-5xl md:text-7xl lg:text-8xl font-black font-space-grotesk tracking-tighter mb-10 max-w-6xl mx-auto leading-[0.85] text-white"
+            className="text-4xl md:text-6xl lg:text-7xl font-black font-space-grotesk tracking-tighter mb-10 max-w-6xl mx-auto leading-[0.85] text-white"
             delay={100}
             animateBy="words"
             direction="bottom"
@@ -59,7 +59,7 @@ export const LandingHero = () => {
           >
             <Link
               href="/login?mode=signup"
-              className="group relative px-12 py-6 bg-orange-500 text-white rounded-2xl font-black text-xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_50px_rgba(249,115,22,0.6)]"
+              className="group relative px-12 py-6 bg-orange-500 text-white rounded-2xl font-black text-xl overflow-hidden transition-all hover:scale-110 active:scale-95 shadow-[0_0_80px_rgba(249,115,22,0.8)]"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 animate-gradient-x" />
               <span className="relative z-10 flex items-center gap-3">
@@ -67,6 +67,8 @@ export const LandingHero = () => {
                 <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
               </span>
               <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
+              {/* God-level Glow Effect */}
+              <div className="absolute -inset-4 bg-orange-500/40 blur-2xl group-hover:opacity-100 opacity-0 transition-opacity rounded-[3rem]" />
             </Link>
           </motion.div>
 
