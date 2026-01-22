@@ -11,7 +11,7 @@ interface MasonryGridProps {
 export const MasonryGrid = ({ children, className }: MasonryGridProps) => {
   return (
     <div className={cn(
-      "columns-1 sm:columns-2 md:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-8 space-y-8 pb-32",
+      "columns-1 sm:columns-2 md:columns-2 lg:columns-2 xl:columns-3 2xl:columns-4 gap-8 space-y-8 pb-32",
       className
     )}>
       {React.Children.map(children, (child) => (

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Minus } from 'lucide-react';
+import { BlurText } from '../ui/blur-text';
 
 const faqs = [
   {
@@ -67,14 +68,13 @@ export const LandingFAQ = () => {
       <div className="container px-6 mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-24">
           <div>
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+            <BlurText
+              text="Frequently Asked Questions."
               className="text-4xl md:text-6xl font-bold font-space-grotesk tracking-tight mb-8"
-            >
-              Frequently Asked <span className="text-zinc-400">Questions.</span>
-            </motion.h2>
+              delay={150}
+              animateBy="words"
+              direction="bottom"
+            />
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}

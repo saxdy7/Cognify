@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Layers, Zap, Brain, Globe, Shield, Sparkles } from 'lucide-react';
+import { Brain, Zap, Layers, Sparkles } from 'lucide-react';
+import { BlurText } from '../ui/blur-text';
 
 const features = [
   {
@@ -51,7 +52,21 @@ export const LandingFeatures = () => {
             viewport={{ once: true }}
             className="text-4xl md:text-7xl font-black font-space-grotesk tracking-tighter mb-8 text-white leading-[0.9]"
           >
-            Engineered for <br /> <span className="text-zinc-600">infinite knowledge.</span>
+            <BlurText
+              text="Engineered for"
+              className=""
+              delay={100}
+              animateBy="words"
+              direction="bottom"
+            />
+            <br />
+            <BlurText
+              text="infinite knowledge."
+              className="text-zinc-600"
+              delay={150}
+              animateBy="words"
+              direction="bottom"
+            />
           </motion.h2>
         </div>
 

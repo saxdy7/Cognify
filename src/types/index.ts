@@ -24,3 +24,12 @@ export interface Bookmark {
   is_favorite: boolean;
   created_at: string;
 }
+
+export interface Notification {
+  id: string;
+  title: string;
+  description: string;
+  type: 'info' | 'success' | 'warning' | 'alert';
+  time: string;
+  read: boolean;
+}

@@ -7,12 +7,13 @@ import { motion } from 'framer-motion';
 interface HeaderProps {
   onAddBookmark: () => void;
   onProfileClick: () => void;
+  onNotificationsClick: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   containerName?: string;
 }
 
-export function Header({ onAddBookmark, onProfileClick, searchQuery, onSearchChange, containerName = 'All Bookmarks' }: HeaderProps) {
+export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, searchQuery, onSearchChange, containerName = 'All Bookmarks' }: HeaderProps) {
   return (
     <header className="h-32 bg-transparent sticky top-0 z-30 px-12 flex items-center justify-between">
       <div className="flex items-center gap-12 flex-1">
@@ -62,18 +63,21 @@ export function Header({ onAddBookmark, onProfileClick, searchQuery, onSearchCha
           Capture Link
         </motion.button>
 
-          <div className="flex items-center gap-2 p-1.5 bg-white/5 dark:bg-black/20 backdrop-blur-xl border border-white/10 dark:border-zinc-800/50 rounded-[1.75rem] shadow-2xl">
-            <button className="w-12 h-12 flex items-center justify-center text-zinc-400 hover:text-black dark:hover:text-white transition-colors relative group">
-              <Bell className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-              <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white dark:border-black animate-bounce" />
-            </button>
-            <div 
-              onClick={onProfileClick}
-              className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800/50 flex items-center justify-center overflow-hidden cursor-pointer hover:scale-110 active:scale-95 transition-all shadow-inner"
-            >
-              <User className="w-5 h-5 text-zinc-400" />
-            </div>
+        <div className="flex items-center gap-2 p-1.5 bg-white/5 dark:bg-black/20 backdrop-blur-xl border border-white/10 dark:border-zinc-800/50 rounded-[1.75rem] shadow-2xl">
+          <button
+            onClick={onNotificationsClick}
+            className="w-12 h-12 flex items-center justify-center text-zinc-400 hover:text-black dark:hover:text-white transition-colors relative group"
+          >
+            <Bell className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+            <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white dark:border-black animate-bounce" />
+          </button>
+          <div
+            onClick={onProfileClick}
+            className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800/50 flex items-center justify-center overflow-hidden cursor-pointer hover:scale-110 active:scale-95 transition-all shadow-inner"
+          >
+            <User className="w-5 h-5 text-zinc-400" />
           </div>
+        </div>
 
       </div>
     </header>
