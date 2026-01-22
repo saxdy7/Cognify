@@ -27,7 +27,7 @@ export function HyperText({
     const [isAnimating, setIsAnimating] = useState(false);
     const [hasAnimated, setHasAnimated] = useState(false);
     const elementRef = useRef<HTMLDivElement>(null);
-    const frameRef = useRef<number>();
+    const frameRef = useRef<number | null>(null);
 
     const scramble = () => {
         if (hasAnimated && !animateOnHover) return;
