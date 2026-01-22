@@ -1,75 +1,97 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export const BackgroundBeams = React.memo(({ className }: { className?: string }) => {
-  const paths = [
-    "M-380 -189C-380 -189 -312 216 152 343C616 470 684 875 684 875",
-    "M-200 -100C-200 -100 -100 300 200 400C500 500 600 900 600 900",
-    "M-400 200C-400 200 -200 400 100 500C400 600 700 800 700 800",
-    "M100 -200C100 -200 200 100 400 200C600 300 800 500 800 500",
-    "M500 -100C500 -100 400 200 300 400C200 600 100 800 100 800",
-    "M300 -300C300 -300 400 -100 500 100C600 300 700 500 700 500",
-    "M-100 -400C-100 -400 0 -200 100 0C200 200 300 400 300 400",
-    "M600 200C600 200 500 400 400 500C300 600 200 700 200 700",
-  ];
+  const beams = useMemo(() => [
+    {
+      d: "M-100 100C150 200 350 -100 600 100C850 300 1050 100 1300 200",
+      duration: 15,
+      delay: 0,
+      color: "#6366f1",
+    },
+    {
+      d: "M-100 300C200 150 450 450 700 300C950 150 1150 350 1400 200",
+      duration: 18,
+      delay: 2,
+      color: "#a855f7",
+    },
+    {
+      d: "M-100 500C250 400 500 600 750 500C1000 400 1200 600 1450 500",
+      duration: 20,
+      delay: 4,
+      color: "#ec4899",
+    },
+    {
+      d: "M-100 700C150 800 400 600 650 700C900 800 1100 600 1350 700",
+      duration: 12,
+      delay: 1,
+      color: "#6366f1",
+    },
+    {
+      d: "M1400 100C1150 200 950 -100 700 100C450 300 250 100 0 200",
+      duration: 22,
+      delay: 3,
+      color: "#3b82f6",
+    },
+  ], []);
 
   return (
-    <div className={cn("absolute h-full w-full inset-0 pointer-events-none overflow-hidden", className)}>
+    <div className={cn("fixed inset-0 z-0 pointer-events-none overflow-hidden bg-zinc-950", className)}>
+      {/* Noise Texture */}
+      <div className="absolute inset-0 opacity-[0.03] mix-blend-overlay pointer-events-none" 
+           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
+      </div>
+
       <svg
-        className="z-0 h-full w-full absolute opacity-20 dark:opacity-30"
+        className="h-full w-full opacity-40"
         width="100%"
         height="100%"
-        viewBox="0 0 696 316"
-        fill="none"
+        viewBox="0 0 1200 800"
+        preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {paths.map((path, index) => (
-          <React.Fragment key={`beam-${index}`}>
+        <defs>
+          {beams.map((beam, i) => (
+            <linearGradient key={`grad-${i}`} id={`beam-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={beam.color} stopOpacity="0" />
+              <stop offset="50%" stopColor={beam.color} stopOpacity="0.5" />
+              <stop offset="100%" stopColor={beam.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+          <filter id="blur">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="40" />
+          </filter>
+        </defs>
+        
+        <g filter="url(#blur)">
+          {beams.map((beam, i) => (
             <motion.path
-              d={path}
-              stroke={`url(#linearGradient-${index})`}
-              strokeOpacity="0.6"
-              strokeWidth="1"
+              key={i}
+              d={beam.d}
+              stroke={`url(#beam-grad-${i})`}
+              strokeWidth="2"
+              fill="none"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ 
-                pathLength: [0, 1], 
-                opacity: [0, 1, 0] 
-              }}
-              transition={{
-                duration: Math.random() * 5 + 5,
-                ease: "easeInOut",
-                repeat: Infinity,
-                delay: Math.random() * 5,
+                pathLength: [0, 1, 0],
+                opacity: [0, 1, 0],
+                transition: {
+                  duration: beam.duration,
+                  delay: beam.delay,
+                  repeat: Infinity,
+                  ease: "linear"
+                }
               }}
             />
-            <defs>
-              <motion.linearGradient
-                id={`linearGradient-${index}`}
-                initial={{ x1: "0%", x2: "0%", y1: "0%", y2: "0%" }}
-                animate={{
-                  x1: ["0%", "100%"],
-                  x2: ["0%", "100%"],
-                  y1: ["0%", "100%"],
-                  y2: ["0%", "100%"],
-                }}
-                transition={{
-                  duration: Math.random() * 5 + 5,
-                  ease: "linear",
-                  repeat: Infinity,
-                }}
-              >
-                <stop stopColor="#6366f1" stopOpacity="0" />
-                <stop stopColor="#6366f1" />
-                <stop offset="50%" stopColor="#a855f7" />
-                <stop offset="100%" stopColor="#ec4899" stopOpacity="0" />
-              </motion.linearGradient>
-            </defs>
-          </React.Fragment>
-        ))}
+          ))}
+        </g>
       </svg>
+      
+      {/* Radial Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
     </div>
   );
 });

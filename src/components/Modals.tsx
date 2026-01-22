@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Loader2, Link as LinkIcon, Type, FileText, Tag as TagIcon, FolderPlus } from 'lucide-react';
+import { X, Loader2, Link as LinkIcon, Type, FileText, Tag as TagIcon, FolderPlus, Sparkles, Zap, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
@@ -17,31 +17,41 @@ function Modal({ isOpen, onClose, title, children }: ModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.9, y: 40 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-[51] overflow-hidden"
+            exit={{ opacity: 0, scale: 0.9, y: 40 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="relative w-full max-w-xl bg-white/5 dark:bg-zinc-900/50 backdrop-blur-3xl border border-white/10 dark:border-zinc-800/50 rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden"
           >
-            <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between">
-              <h2 className="text-lg font-bold">{title}</h2>
-              <button onClick={onClose} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full transition-colors">
-                <X className="w-5 h-5" />
+            <div className="px-10 py-8 border-b border-white/5 dark:border-zinc-800/50 flex items-center justify-between">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Protocol</span>
+                </div>
+                <h2 className="text-2xl font-black font-space-grotesk tracking-tight text-zinc-900 dark:text-white">{title}</h2>
+              </div>
+              <button 
+                onClick={onClose} 
+                className="w-12 h-12 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl hover:scale-110 active:scale-95 transition-all text-zinc-400 hover:text-red-500"
+              >
+                <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-10">
               {children}
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );
@@ -72,8 +82,7 @@ export function AddBookmarkModal({
       setStep(2);
     } catch (error) {
       console.error(error);
-      alert('Failed to analyze URL. You can still add it manually.');
-      setDetails({ url, title: '', description: '', tags: [] });
+      setDetails({ url, title: '', description: '', tags: [], category: 'Other' });
       setStep(2);
     } finally {
       setLoading(false);
@@ -97,91 +106,118 @@ export function AddBookmarkModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add New Bookmark">
+    <Modal isOpen={isOpen} onClose={onClose} title="Capture Resource">
       {step === 1 ? (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-              Paste your link
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <label className="block text-sm font-bold text-zinc-500 tracking-wide uppercase">
+              Target Link
             </label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-              <input
-                autoFocus
-                type="url"
-                placeholder="https://example.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && analyzeUrl()}
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-black dark:focus:ring-white outline-none transition-all"
-              />
+            <div className="relative group">
+              <div className="absolute inset-0 bg-indigo-500/10 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+              <div className="relative">
+                <LinkIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-indigo-500 transition-colors" />
+                <input
+                  autoFocus
+                  type="url"
+                  placeholder="https://app.example.com/project"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && analyzeUrl()}
+                  className="w-full pl-16 pr-6 py-5 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold placeholder:text-zinc-500 focus:border-indigo-500/50 outline-none transition-all"
+                />
+              </div>
             </div>
           </div>
           <button
             onClick={analyzeUrl}
             disabled={!url || loading}
-            className="w-full py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all"
+            className="w-full py-5 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] font-black flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all shadow-2xl"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue'}
+            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+              <>
+                <Zap className="w-5 h-5 fill-current" />
+                Analyze Link
+              </>
+            )}
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex items-center gap-4 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-            <div className="w-12 h-12 bg-white dark:bg-black rounded-lg border border-zinc-100 dark:border-zinc-800 flex items-center justify-center overflow-hidden">
-                <img src={details.logo_url} className="w-8 h-8 object-contain" />
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="flex items-center gap-6 p-6 bg-zinc-100 dark:bg-black/40 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/50">
+            <div className="w-20 h-20 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-100 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                {details.logo_url ? (
+                  <img src={details.logo_url} className="w-12 h-12 object-contain" />
+                ) : (
+                  <ShieldCheck className="w-10 h-10 text-indigo-400" />
+                )}
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate">{details.title}</p>
-                <p className="text-xs text-zinc-500 truncate">{url}</p>
+                <p className="text-lg font-black font-space-grotesk truncate text-zinc-900 dark:text-white">{details.title}</p>
+                <p className="text-xs font-bold text-zinc-500 truncate tracking-wide uppercase">{url}</p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Title</label>
-              <input
-                value={details.title}
-                onChange={(e) => setDetails({ ...details, title: e.target.value })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-black dark:focus:border-white transition-colors"
-              />
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Title</label>
+                <input
+                  value={details.title}
+                  onChange={(e) => setDetails({ ...details, title: e.target.value })}
+                  className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Category</label>
+                <input
+                  value={details.category}
+                  onChange={(e) => setDetails({ ...details, category: e.target.value })}
+                  className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Description</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Intelligence Summary</label>
               <textarea
                 value={details.description}
                 onChange={(e) => setDetails({ ...details, description: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-black dark:focus:border-white transition-colors resize-none"
+                className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all resize-none"
               />
             </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Container</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Destination Space</label>
               <select
                 value={details.container_id || ''}
                 onChange={(e) => setDetails({ ...details, container_id: e.target.value })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-black dark:focus:border-white transition-colors"
+                className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer"
               >
-                <option value="">No Container</option>
+                <option value="">Ungrouped Discovery</option>
                 {containers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-4">
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-900 rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+              className="flex-1 py-5 bg-zinc-100 dark:bg-zinc-800/50 rounded-[1.5rem] font-black text-sm hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all"
             >
-              Back
+              Re-scan
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-[2] py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all"
+              className="flex-[2] py-5 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] font-black flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl"
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Bookmark'}
+              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+                <>
+                  <Sparkles className="w-5 h-5 fill-current" />
+                  Save to Hub
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -218,30 +254,38 @@ export function AddContainerModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Container">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-            Container Name
+    <Modal isOpen={isOpen} onClose={onClose} title="Initialize Space">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="space-y-4">
+          <label className="block text-sm font-bold text-zinc-500 tracking-wide uppercase">
+            Space Designation
           </label>
-          <div className="relative">
-            <FolderPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input
-              autoFocus
-              type="text"
-              placeholder="e.g. AI Tools, Reading List"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-black dark:focus:ring-white outline-none transition-all"
-            />
+          <div className="relative group">
+            <div className="absolute inset-0 bg-indigo-500/10 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+            <div className="relative">
+              <FolderPlus className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-indigo-500 transition-colors" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="e.g. Synthetic Architectures, Neural Assets"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full pl-16 pr-6 py-5 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold placeholder:text-zinc-500 focus:border-indigo-500/50 outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
         <button
           type="submit"
           disabled={!name || loading}
-          className="w-full py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all"
+          className="w-full py-5 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] font-black flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all shadow-2xl"
         >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Container'}
+          {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+            <>
+              <Zap className="w-5 h-5 fill-current" />
+              Activate Space
+            </>
+          )}
         </button>
       </form>
     </Modal>
