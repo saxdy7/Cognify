@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const metadata = extraction.data;
     const domain = validUrl.hostname;
 
-    // Smart Logo Detection
+    // Smart Logo Detection - Safe Access Fix
     const ogImage = Array.isArray(metadata.ogImage) ? metadata.ogImage[0] : metadata.ogImage;
     const ogImageUrl = typeof ogImage === 'object' ? ogImage?.url : ogImage;
 
