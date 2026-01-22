@@ -226,6 +226,127 @@ export function AddBookmarkModal({
   );
 }
 
+export function EditBookmarkModal({ 
+  isOpen, 
+  onClose, 
+  onUpdate,
+  bookmark,
+  containers 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onUpdate: (id: string, data: any) => Promise<void>;
+  bookmark: any;
+  containers: any[];
+}) {
+  const [details, setDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (bookmark) {
+      setDetails({ ...bookmark });
+    }
+  }, [bookmark]);
+
+  if (!details) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onUpdate(bookmark.id, details);
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Resource Details">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="flex items-center gap-6 p-6 bg-zinc-100 dark:bg-black/40 rounded-[2rem] border border-zinc-200 dark:border-zinc-800/50">
+          <div className="w-20 h-20 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-100 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+              {details.logo_url ? (
+                <img src={details.logo_url} className="w-12 h-12 object-contain" />
+              ) : (
+                <ShieldCheck className="w-10 h-10 text-indigo-400" />
+              )}
+          </div>
+          <div className="flex-1 min-w-0">
+              <p className="text-lg font-black font-space-grotesk truncate text-zinc-900 dark:text-white">{details.title}</p>
+              <p className="text-xs font-bold text-zinc-500 truncate tracking-wide uppercase">{details.url}</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Title</label>
+              <input
+                value={details.title || ''}
+                onChange={(e) => setDetails({ ...details, title: e.target.value })}
+                className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Category</label>
+              <input
+                value={details.category || ''}
+                onChange={(e) => setDetails({ ...details, category: e.target.value })}
+                className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Intelligence Summary</label>
+            <textarea
+              value={details.description || ''}
+              onChange={(e) => setDetails({ ...details, description: e.target.value })}
+              rows={5}
+              className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all resize-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-2">Destination Space</label>
+            <select
+              value={details.container_id || ''}
+              onChange={(e) => setDetails({ ...details, container_id: e.target.value })}
+              className="w-full px-5 py-4 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer"
+            >
+              <option value="">Ungrouped Discovery</option>
+              {containers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-5 bg-zinc-100 dark:bg-zinc-800/50 rounded-[1.5rem] font-black text-sm hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-[2] py-5 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] font-black flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl"
+          >
+            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+              <>
+                <Sparkles className="w-5 h-5 fill-current" />
+                Update Resource
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function AddContainerModal({ 
   isOpen, 
   onClose, 

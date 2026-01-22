@@ -36,7 +36,7 @@ export const LandingHero = () => {
 
           <BlurText
             text="Configure Your Digital Universe"
-            className="text-4xl md:text-6xl lg:text-7xl font-black font-space-grotesk tracking-tighter mb-10 max-w-6xl mx-auto leading-[0.85] text-white"
+            className="text-3xl md:text-5xl lg:text-6xl font-black font-space-grotesk tracking-tighter mb-10 max-w-5xl mx-auto leading-[0.85] text-white"
             delay={100}
             animateBy="words"
             direction="bottom"
@@ -46,7 +46,7 @@ export const LandingHero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 1 }}
-            className="text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto mb-16 leading-relaxed font-medium"
+            className="text-base md:text-lg text-zinc-400 max-w-2xl mx-auto mb-16 leading-relaxed font-medium"
           >
             Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with AI-powered organization.
           </motion.p>
@@ -59,16 +59,21 @@ export const LandingHero = () => {
           >
             <Link
               href="/login?mode=signup"
-              className="group relative px-12 py-6 bg-orange-500 text-white rounded-2xl font-black text-xl overflow-hidden transition-all hover:scale-110 active:scale-95 shadow-[0_0_80px_rgba(249,115,22,0.8)]"
+              className="group relative px-14 py-7 bg-orange-500 text-white rounded-[2rem] font-black text-2xl overflow-hidden transition-all hover:scale-110 active:scale-95 shadow-[0_0_100px_rgba(249,115,22,0.6)]"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 animate-gradient-x" />
-              <span className="relative z-10 flex items-center gap-3">
+              <span className="relative z-10 flex items-center gap-4">
                 Get Started
-                <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="w-8 h-8 transition-transform group-hover:translate-x-2" />
               </span>
-              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
-              {/* God-level Glow Effect */}
-              <div className="absolute -inset-4 bg-orange-500/40 blur-2xl group-hover:opacity-100 opacity-0 transition-opacity rounded-[3rem]" />
+              
+              {/* God-level Animated Border */}
+              <div className="absolute inset-0 rounded-[2rem] p-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/40 to-white/0 animate-shimmer" />
+              </div>
+              
+              {/* God-level Glow Pulse */}
+              <div className="absolute -inset-8 bg-orange-400/30 blur-3xl animate-pulse group-hover:bg-orange-400/50 transition-colors" />
             </Link>
           </motion.div>
 

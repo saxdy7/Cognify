@@ -27,23 +27,16 @@ export const LandingNavbar = () => {
             </Link>
 
             <div className="hidden md:flex items-center gap-10">
-              {['Features', 'Testimonials', 'FAQ'].map((item) => (
-                <Link 
-                  key={item} 
-                  href={`#${item.toLowerCase()}`}
-                  className="text-sm font-black uppercase tracking-widest text-zinc-400 hover:text-orange-400 transition-colors"
-                >
-                  {item}
-                </Link>
-              ))}
+              {/* Simplified Navigation */}
             </div>
 
             <div className="flex items-center gap-4">
               <Link 
                 href="/login?mode=signup"
-                className="text-sm font-black uppercase tracking-widest px-8 py-3 bg-white text-black rounded-2xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-95"
+                className="group relative px-8 py-3 bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest overflow-hidden transition-all hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(249,115,22,0.4)]"
               >
-                Get Started
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 animate-gradient-x" />
+                <span className="relative z-10">Get Started</span>
               </Link>
             <button 
               className="md:hidden p-2"

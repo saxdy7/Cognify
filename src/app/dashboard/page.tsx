@@ -6,11 +6,11 @@ import { Header } from '@/components/Header';
 import { BookmarkCard } from '@/components/BookmarkCard';
 import { MasonryGrid } from '@/components/MasonryGrid';
 import { MicroExpander } from '@/components/MicroExpander';
-import { AddBookmarkModal, AddContainerModal } from '@/components/Modals';
+import { AddBookmarkModal, AddContainerModal, EditBookmarkModal } from '@/components/Modals';
 import { supabase } from '@/lib/supabase';
 import { Bookmark, Container } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Plus, Sparkles, Settings } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Settings, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -21,9 +21,11 @@ export default function Dashboard() {
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<any>(null);
+  const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
   const router = useRouter();
   
   const [isAddBookmarkOpen, setIsAddBookmarkOpen] = useState(false);
+  const [isEditBookmarkOpen, setIsEditBookmarkOpen] = useState(false);
   const [isAddContainerOpen, setIsAddContainerOpen] = useState(false);
 
   useEffect(() => {
@@ -110,13 +112,35 @@ export default function Dashboard() {
           setBookmarks([data[0], ...bookmarks]);
           toast.success('Resource captured to hub');
         }
-      } catch (error) {
-        console.error('Error adding bookmark:', error);
-        toast.error('Failed to capture resource');
-      }
-    };
+        } catch (error) {
+          console.error('Error adding bookmark:', error);
+          toast.error('Failed to capture resource');
+        }
+      };
 
-  const handleToggleFavorite = async (bookmark: Bookmark) => {
+      const handleUpdateBookmark = async (id: string, updatedData: any) => {
+        try {
+          const { error } = await supabase
+            .from('bookmarks')
+            .update({
+              title: updatedData.title,
+              description: updatedData.description,
+              category: updatedData.category,
+              container_id: updatedData.container_id || null,
+              tags: updatedData.tags
+            })
+            .eq('id', id);
+          
+          if (error) throw error;
+          setBookmarks(bookmarks.map(b => b.id === id ? { ...b, ...updatedData } : b));
+          toast.success('Resource intelligence updated');
+        } catch (error) {
+          console.error('Error updating bookmark:', error);
+          toast.error('Failed to update resource');
+        }
+      };
+
+    const handleToggleFavorite = async (bookmark: Bookmark) => {
     try {
       const { error } = await supabase
         .from('bookmarks')
@@ -324,64 +348,76 @@ export default function Dashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <BookmarkCard 
-                          bookmark={bookmark} 
-                          onEdit={() => {}} 
-                          onDelete={handleDeleteBookmark}
-                          onToggleFavorite={handleToggleFavorite}
-                          onToggleShortcut={handleToggleShortcut}
-                        />
-                      </motion.div>
-                  ))}
-                </AnimatePresence>
-              </MasonryGrid>
-            </div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
-              <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-8 shadow-inner">
-                <Sparkles className="w-10 h-10 text-zinc-400" />
+                          <BookmarkCard 
+                            bookmark={bookmark} 
+                            onEdit={(b) => {
+                              setSelectedBookmark(b);
+                              setIsEditBookmarkOpen(true);
+                            }} 
+                            onDelete={handleDeleteBookmark}
+                            onToggleFavorite={handleToggleFavorite}
+                            onToggleShortcut={handleToggleShortcut}
+                          />
+                        </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </MasonryGrid>
               </div>
-              <h2 className="text-2xl font-bold mb-3 font-space-grotesk">No inspiration yet</h2>
-              <p className="text-zinc-500 mb-10 leading-relaxed">
-                {searchQuery 
-                  ? "We couldn't find anything matching your search. Try a broader term." 
-                  : "Start building your God-level knowledge hub by adding your first resource."}
-              </p>
-              {!searchQuery && (
-                <button
-                  onClick={() => setIsAddBookmarkOpen(true)}
-                  className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl active:scale-95"
-                >
-                  Create Bookmark
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
+                <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-8 shadow-inner">
+                  <Sparkles className="w-10 h-10 text-zinc-400" />
+                </div>
+                <h2 className="text-2xl font-bold mb-3 font-space-grotesk">No inspiration yet</h2>
+                <p className="text-zinc-500 mb-10 leading-relaxed">
+                  {searchQuery 
+                    ? "We couldn't find anything matching your search. Try a broader term." 
+                    : "Start building your God-level knowledge hub by adding your first resource."}
+                </p>
+                {!searchQuery && (
+                  <button
+                    onClick={() => setIsAddBookmarkOpen(true)}
+                    className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl active:scale-95"
+                  >
+                    Create Bookmark
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+  
+        <MicroExpander 
+          onAddBookmark={() => setIsAddBookmarkOpen(true)}
+          onAddContainer={() => setIsAddContainerOpen(true)}
+          onSearch={() => {
+            const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+            input?.focus();
+          }}
+          onToggleFavorites={() => setSelectedContainerId(selectedContainerId === 'favorites' ? null : 'favorites')}
+        />
+  
+        <AddBookmarkModal 
+          isOpen={isAddBookmarkOpen} 
+          onClose={() => setIsAddBookmarkOpen(false)}
+          onAdd={handleAddBookmark}
+          containers={containers}
+        />
 
-      <MicroExpander 
-        onAddBookmark={() => setIsAddBookmarkOpen(true)}
-        onAddContainer={() => setIsAddContainerOpen(true)}
-        onSearch={() => {
-          const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-          input?.focus();
-        }}
-        onToggleFavorites={() => setSelectedContainerId(selectedContainerId === 'favorites' ? null : 'favorites')}
-      />
+        <EditBookmarkModal
+          isOpen={isEditBookmarkOpen}
+          onClose={() => setIsEditBookmarkOpen(false)}
+          onUpdate={handleUpdateBookmark}
+          bookmark={selectedBookmark}
+          containers={containers}
+        />
+  
+        <AddContainerModal 
+          isOpen={isAddContainerOpen}
+          onClose={() => setIsAddContainerOpen(false)}
+          onAdd={handleAddContainer}
+        />
+      </div>
+    );
+  }
 
-      <AddBookmarkModal 
-        isOpen={isAddBookmarkOpen} 
-        onClose={() => setIsAddBookmarkOpen(false)}
-        onAdd={handleAddBookmark}
-        containers={containers}
-      />
-
-      <AddContainerModal 
-        isOpen={isAddContainerOpen}
-        onClose={() => setIsAddContainerOpen(false)}
-        onAdd={handleAddContainer}
-      />
-    </div>
-  );
-}

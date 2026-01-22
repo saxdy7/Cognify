@@ -84,7 +84,10 @@ export function BookmarkCard({ bookmark, onEdit, onDelete, onToggleFavorite, onT
       </div>
 
       {/* Content */}
-      <div className="p-8 flex flex-col flex-1">
+      <div 
+        className="p-8 flex flex-col flex-1 cursor-pointer"
+        onClick={() => onEdit(bookmark)}
+      >
         <div className="flex items-start gap-4 mb-6">
           <div className="w-14 h-14 rounded-[1.25rem] bg-white/10 dark:bg-zinc-800/80 border border-white/10 dark:border-zinc-700/50 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group-hover:border-indigo-500/50 transition-colors">
             {bookmark.logo_url ? (
