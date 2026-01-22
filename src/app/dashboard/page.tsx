@@ -34,6 +34,11 @@ export default function Dashboard() {
     { id: '1', title: 'Welcome to Cognify 2.0', description: 'System initialized. Experience the new God-level dashboard.', type: 'info', time: 'Just now', read: false }
   ]);
 
+  /**
+   * Centralized Notification Handler
+   * Captures all system alerts (Success, Warning, Info) and pushes them to the Inbox.
+   * used by: Container Creation, Bookmark Operations, System Events.
+   */
   const addNotification = (title: string, description: string, type: 'info' | 'success' | 'warning' | 'alert' = 'info') => {
     const newNotification: Notification = {
       id: Math.random().toString(36).substr(2, 9),
