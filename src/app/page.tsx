@@ -1,223 +1,71 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Sidebar } from '@/components/Sidebar';
-import { Header } from '@/components/Header';
-import { BookmarkCard } from '@/components/BookmarkCard';
-import { MasonryGrid } from '@/components/MasonryGrid';
-import { MicroExpander } from '@/components/MicroExpander';
-import { AddBookmarkModal, AddContainerModal } from '@/components/Modals';
-import { supabase } from '@/lib/supabase';
-import { Bookmark, Container } from '@/types';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Plus, Sparkles } from 'lucide-react';
+import React from 'react';
+import { LandingNavbar } from '@/components/landing/Navbar';
+import { LandingHero } from '@/components/landing/Hero';
+import { LandingFeatures } from '@/components/landing/Features';
+import { LandingFAQ } from '@/components/landing/FAQ';
+import { LandingFooter } from '@/components/landing/Footer';
+import { motion } from 'framer-motion';
 
-const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000';
-
-export default function Dashboard() {
-  const [containers, setContainers] = useState<Container[]>([]);
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const [isAddBookmarkOpen, setIsAddBookmarkOpen] = useState(false);
-  const [isAddContainerOpen, setIsAddContainerOpen] = useState(false);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const { data: containersData } = await supabase
-        .from('containers')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      const { data: bookmarksData } = await supabase
-        .from('bookmarks')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      setContainers(containersData || []);
-      setBookmarks(bookmarksData || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddContainer = async (name: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('containers')
-        .insert([{ name, user_id: DUMMY_USER_ID }])
-        .select();
-      
-      if (error) throw error;
-      if (data) setContainers([data[0], ...containers]);
-    } catch (error) {
-      console.error('Error adding container:', error);
-    }
-  };
-
-  const handleAddBookmark = async (bookmarkData: any) => {
-    try {
-      const { data, error } = await supabase
-        .from('bookmarks')
-        .insert([{ 
-          ...bookmarkData, 
-          user_id: DUMMY_USER_ID,
-          tags: bookmarkData.tags || []
-        }])
-        .select();
-      
-      if (error) throw error;
-      if (data) setBookmarks([data[0], ...bookmarks]);
-    } catch (error) {
-      console.error('Error adding bookmark:', error);
-    }
-  };
-
-  const handleToggleFavorite = async (bookmark: Bookmark) => {
-    try {
-      const { error } = await supabase
-        .from('bookmarks')
-        .update({ is_favorite: !bookmark.is_favorite })
-        .eq('id', bookmark.id);
-      
-      if (error) throw error;
-      setBookmarks(bookmarks.map(b => 
-        b.id === bookmark.id ? { ...b, is_favorite: !b.is_favorite } : b
-      ));
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
-  };
-
-  const handleDeleteBookmark = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this bookmark?')) return;
-    try {
-      const { error } = await supabase
-        .from('bookmarks')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      setBookmarks(bookmarks.filter(b => b.id !== id));
-    } catch (error) {
-      console.error('Error deleting bookmark:', error);
-    }
-  };
-
-  const filteredBookmarks = bookmarks.filter(b => {
-    const matchesSearch = b.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         b.url.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         b.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (selectedContainerId === 'favorites') return b.is_favorite && matchesSearch;
-    if (selectedContainerId) return b.container_id === selectedContainerId && matchesSearch;
-    return matchesSearch;
-  });
-
-  const selectedContainerName = selectedContainerId === 'favorites' 
-    ? 'Favorites' 
-    : containers.find(c => c.id === selectedContainerId)?.name || 'All Bookmarks';
-
+export default function LandingPage() {
   return (
-    <div className="flex min-h-screen bg-transparent text-zinc-900 dark:text-zinc-100 font-sans">
-      <Sidebar 
-        containers={containers} 
-        selectedContainerId={selectedContainerId}
-        onSelectContainer={setSelectedContainerId}
-        onAddContainer={() => setIsAddContainerOpen(true)}
-      />
-
-      <main className="flex-1 flex flex-col min-w-0">
-        <Header 
-          onAddBookmark={() => setIsAddBookmarkOpen(true)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          containerName={selectedContainerName}
-        />
-
-        <div className="flex-1 p-8 lg:p-12">
-          {loading ? (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-400">
-              <Loader2 className="w-8 h-8 animate-spin mb-4" />
-              <p className="text-sm font-medium">Loading your Cognify hub...</p>
-            </div>
-          ) : filteredBookmarks.length > 0 ? (
-            <div className="max-w-[2000px] mx-auto">
-              <MasonryGrid>
-                <AnimatePresence mode="popLayout">
-                  {filteredBookmarks.map((bookmark, index) => (
-                    <motion.div
-                      key={bookmark.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <BookmarkCard 
-                        bookmark={bookmark} 
-                        onEdit={() => {}} 
-                        onDelete={handleDeleteBookmark}
-                        onToggleFavorite={handleToggleFavorite}
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </MasonryGrid>
-            </div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
-              <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-8 shadow-inner">
-                <Sparkles className="w-10 h-10 text-zinc-400" />
+    <div className="relative min-h-screen bg-white dark:bg-black text-black dark:text-white font-sans selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black">
+      <LandingNavbar />
+      
+      <main>
+        <LandingHero />
+        
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1 }}
+          className="relative z-10"
+        >
+          <LandingFeatures />
+          
+          {/* Social Proof / Companies Section */}
+          <section className="py-20 border-y border-zinc-100 dark:border-zinc-900 overflow-hidden">
+            <div className="container px-6 mx-auto">
+              <p className="text-center text-xs font-bold uppercase tracking-widest text-zinc-400 mb-12">Trusted by builders at</p>
+              <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-40 grayscale">
+                {['Linear', 'Vercel', 'Stripe', 'Supabase', 'Framer'].map((name) => (
+                  <span key={name} className="text-2xl font-bold font-space-grotesk">{name}</span>
+                ))}
               </div>
-              <h2 className="text-2xl font-bold mb-3 font-space-grotesk">No inspiration yet</h2>
-              <p className="text-zinc-500 mb-10 leading-relaxed">
-                {searchQuery 
-                  ? "We couldn't find anything matching your search. Try a broader term." 
-                  : "Start building your God-level knowledge hub by adding your first resource."}
-              </p>
-              {!searchQuery && (
-                <button
-                  onClick={() => setIsAddBookmarkOpen(true)}
-                  className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl active:scale-95"
-                >
-                  Create Bookmark
-                </button>
-              )}
             </div>
-          )}
-        </div>
+          </section>
+
+          <LandingFAQ />
+          
+          {/* Final CTA */}
+          <section className="py-32 relative overflow-hidden">
+            <div className="container px-6 mx-auto relative z-10">
+              <div className="max-w-5xl mx-auto p-12 md:p-24 rounded-[3rem] bg-black dark:bg-zinc-900 text-white text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent)]" />
+                
+                <h2 className="text-4xl md:text-7xl font-bold font-space-grotesk tracking-tight mb-10 relative z-10">
+                  Ready to evolve your <br /> <span className="text-zinc-500">digital workflow?</span>
+                </h2>
+                <p className="text-xl text-zinc-400 mb-12 max-w-2xl mx-auto relative z-10">
+                  Join 50,000+ creators who have already elevated their knowledge management to the next level.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-6 relative z-10">
+                  <button className="px-12 py-6 bg-white text-black rounded-2xl font-bold text-xl hover:scale-105 transition-transform active:scale-95 shadow-2xl">
+                    Get Started for Free
+                  </button>
+                  <button className="px-12 py-6 bg-transparent border border-white/20 rounded-2xl font-bold text-xl hover:bg-white/5 transition-all">
+                    Talk to Sales
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </motion.div>
       </main>
 
-      <MicroExpander 
-        onAddBookmark={() => setIsAddBookmarkOpen(true)}
-        onAddContainer={() => setIsAddContainerOpen(true)}
-        onSearch={() => {
-          const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-          input?.focus();
-        }}
-        onToggleFavorites={() => setSelectedContainerId(selectedContainerId === 'favorites' ? null : 'favorites')}
-      />
-
-      <AddBookmarkModal 
-        isOpen={isAddBookmarkOpen} 
-        onClose={() => setIsAddBookmarkOpen(false)}
-        onAdd={handleAddBookmark}
-        containers={containers}
-      />
-
-      <AddContainerModal 
-        isOpen={isAddContainerOpen}
-        onClose={() => setIsAddContainerOpen(false)}
-        onAdd={handleAddContainer}
-      />
+      <LandingFooter />
     </div>
   );
 }
