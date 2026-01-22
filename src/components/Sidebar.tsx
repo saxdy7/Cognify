@@ -22,8 +22,8 @@ export function Sidebar({
   isFavorites 
 }: SidebarProps) {
   return (
-    <aside className="w-80 h-screen sticky top-0 z-40 flex flex-col bg-white/5 dark:bg-black/5 backdrop-blur-3xl border-r border-white/10 dark:border-zinc-800/50">
-      <div className="p-10 flex flex-col h-full overflow-hidden">
+    <aside className="w-80 h-screen sticky top-0 z-40 flex flex-col bg-white/5 dark:bg-black/10 backdrop-blur-2xl border-r border-white/10 dark:border-white/5 shadow-2xl">
+      <div className="p-10 flex flex-col h-full">
         {/* Brand */}
         <div className="flex items-center gap-4 mb-14 group cursor-pointer">
           <div className="w-12 h-12 bg-black dark:bg-white rounded-[1.25rem] flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.2)] dark:shadow-[0_10px_30px_rgba(255,255,255,0.1)] group-hover:scale-110 transition-transform duration-500">
