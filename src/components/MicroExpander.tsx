@@ -28,7 +28,7 @@ export const MicroExpander = ({
   ];
 
   return (
-    <div className="fixed bottom-12 right-12 z-[100]">
+    <div className="hidden sm:block fixed bottom-8 right-8 sm:bottom-10 sm:right-10 md:bottom-12 md:right-12 z-[100]">
       <AnimatePresence>
         {isOpen && (
           <motion.div

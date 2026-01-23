@@ -34,8 +34,8 @@ const features = [
 
 export const LandingFeatures = () => {
   return (
-    <section id="features" className="py-32 bg-black relative overflow-hidden">
-      <div className="container px-6 mx-auto">
+    <section id="features" className="py-16 md:py-24 lg:py-32 bg-black relative overflow-hidden">
+      <div className="container px-4 sm:px-6 mx-auto">
         <div className="max-w-4xl mb-24 text-center mx-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -70,7 +70,7 @@ export const LandingFeatures = () => {
           </motion.h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-5xl mx-auto relative z-10">
           {features.map((feature, index) => (
             <motion.div
               key={feature.title}

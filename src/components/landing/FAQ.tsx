@@ -64,9 +64,9 @@ const FAQItem = ({ question, answer, index }: { question: string, answer: string
 
 export const LandingFAQ = () => {
   return (
-    <section id="faq" className="py-32 bg-white dark:bg-black">
-      <div className="container px-6 mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-24">
+    <section id="faq" className="py-16 md:py-24 lg:py-32 bg-white dark:bg-black">
+      <div className="container px-4 sm:px-6 mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 lg:gap-24">
           <div>
             <BlurText
               text="Frequently Asked Questions."

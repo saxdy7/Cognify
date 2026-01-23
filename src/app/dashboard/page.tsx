@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [isEditBookmarkOpen, setIsEditBookmarkOpen] = useState(false);
   const [isAddContainerOpen, setIsAddContainerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [notifications, setNotifications] = useState<Notification[]>([
     { id: '1', title: 'Welcome to Cognify 2.0', description: 'System initialized. Experience the new God-level dashboard.', type: 'info', time: 'Just now', read: false }
@@ -276,15 +277,21 @@ export default function Dashboard() {
       <Sidebar
         containers={containers}
         selectedContainerId={selectedContainerId}
-        onSelectContainer={setSelectedContainerId}
+        onSelectContainer={(id) => {
+          setSelectedContainerId(id);
+          setIsMobileSidebarOpen(false);
+        }}
         onAddContainer={() => setIsAddContainerOpen(true)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
 
       <main className={cn(
         "flex-1 flex flex-col min-w-0 relative z-10 transition-all duration-300 ease-in-out",
-        isSidebarCollapsed ? "ml-24" : "ml-80"
+        "ml-0 lg:ml-24",
+        !isSidebarCollapsed && "lg:ml-80"
       )}>
         <Header
           onAddBookmark={() => setIsAddBookmarkOpen(true)}
@@ -293,12 +300,13 @@ export default function Dashboard() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           containerName={selectedContainerName}
+          onMenuClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
 
-        <div className="flex-1 p-8 lg:p-12 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 lg:p-12 overflow-y-auto custom-scrollbar">
           {/* View Toggle & Content Header */}
           {selectedContainerId !== 'settings' && selectedContainerId !== 'notifications' && (
-            <div className="flex items-center justify-end mb-8 gap-2">
+            <div className="flex items-center justify-end mb-4 sm:mb-6 md:mb-8 gap-2">
               <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-xl">
                 <button
                   onClick={() => setViewMode('grid')}
@@ -323,30 +331,30 @@ export default function Dashboard() {
           )}
 
           {selectedContainerId === 'notifications' ? (
-            <div className="max-w-3xl mx-auto py-20">
+            <div className="max-w-3xl mx-auto py-6 sm:py-8 md:py-12 lg:py-16 xl:py-20">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between mb-16"
+                className="flex items-center justify-between mb-8 sm:mb-12 md:mb-16 gap-2"
               >
-                <div className="flex items-center gap-6">
-                  <div className="w-20 h-20 bg-indigo-500 rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.3)]">
-                    <Bell className="w-10 h-10 text-white" />
+                <div className="flex items-center gap-3 sm:gap-4 md:gap-6 min-w-0 flex-1">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 bg-indigo-500 rounded-xl sm:rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center shadow-[0_10px_30px_rgba(99,102,241,0.3)] sm:shadow-[0_20px_50px_rgba(99,102,241,0.3)] shrink-0">
+                    <Bell className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-5xl font-black font-space-grotesk tracking-tighter text-white">Inbox</h2>
-                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] mt-2">Latest system updates & alerts</p>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black font-space-grotesk tracking-tighter text-white truncate">Inbox</h2>
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-[8px] sm:text-[9px] md:text-[10px] mt-1 sm:mt-2">Latest system updates & alerts</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setNotifications([])}
-                  className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl text-xs font-black text-zinc-400 uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
+                  className="hidden sm:flex px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 bg-white/5 border border-white/5 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] md:text-xs font-black text-zinc-400 uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all shrink-0"
                 >
                   Mark all read
                 </button>
               </motion.div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <AnimatePresence mode="popLayout">
                   {notifications.length > 0 ? (
                     notifications.map((item, i) => (
@@ -357,32 +365,32 @@ export default function Dashboard() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
                         transition={{ delay: i * 0.05 }}
-                        className="group p-6 bg-white/5 border border-white/5 hover:border-white/10 rounded-[2rem] backdrop-blur-3xl flex items-center gap-6 cursor-pointer hover:bg-white/[0.07] transition-all relative pr-12"
+                        className="group p-4 sm:p-5 md:p-6 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl sm:rounded-[1.5rem] md:rounded-[2rem] backdrop-blur-3xl flex items-center gap-3 sm:gap-4 md:gap-6 cursor-pointer hover:bg-white/[0.07] transition-all relative pr-10 sm:pr-12"
                       >
                         <div className={cn(
-                          "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0",
+                          "w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0",
                           item.type === 'success' ? "bg-green-500/10 text-green-500" :
                             item.type === 'warning' ? "bg-yellow-500/10 text-yellow-500" :
                               item.type === 'alert' ? "bg-red-500/10 text-red-500" :
                                 "bg-blue-500/10 text-blue-500"
                         )}>
-                          {item.type === 'success' ? <CheckCircle className="w-6 h-6" /> :
-                            item.type === 'warning' ? <AlertTriangle className="w-6 h-6" /> :
-                              item.type === 'alert' ? <AlertTriangle className="w-6 h-6" /> :
-                                <Info className="w-6 h-6" />}
+                          {item.type === 'success' ? <CheckCircle className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6" /> :
+                            item.type === 'warning' ? <AlertTriangle className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6" /> :
+                              item.type === 'alert' ? <AlertTriangle className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6" /> :
+                                <Info className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6" />}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors">{item.title}</h3>
-                            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{item.time}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-1">
+                            <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-indigo-300 transition-colors truncate">{item.title}</h3>
+                            <span className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-zinc-600 uppercase tracking-widest shrink-0">{item.time}</span>
                           </div>
-                          <p className="text-sm text-zinc-500 leading-relaxed font-medium">{item.description}</p>
+                          <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed font-medium line-clamp-2">{item.description}</p>
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleRemoveNotification(item.id); }}
-                          className="absolute right-6 top-1/2 -translate-y-1/2 p-2 rounded-xl text-zinc-600 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+                          className="absolute right-3 sm:right-4 md:right-6 top-1/2 -translate-y-1/2 p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-zinc-600 hover:text-white hover:bg-white/10 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                         >
-                          <X className="w-5 h-5" />
+                          <X className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                       </motion.div>
                     ))
@@ -390,54 +398,54 @@ export default function Dashboard() {
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="text-center py-20"
+                      className="text-center py-12 sm:py-16 md:py-20"
                     >
-                      <Sparkles className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-                      <p className="text-zinc-500 font-medium">No new notifications</p>
+                      <Sparkles className="w-10 h-10 sm:w-12 sm:h-12 text-zinc-600 mx-auto mb-3 sm:mb-4" />
+                      <p className="text-sm sm:text-base text-zinc-500 font-medium">No new notifications</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
             </div>
           ) : selectedContainerId === 'settings' ? (
-            <div className="max-w-4xl mx-auto py-20">
+            <div className="max-w-4xl mx-auto py-6 sm:py-8 md:py-12 lg:py-16 xl:py-20">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-6 mb-16"
+                className="flex items-center gap-3 sm:gap-4 md:gap-6 mb-8 sm:mb-12 md:mb-16"
               >
-                <div className="w-20 h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_rgba(249,115,22,0.3)]">
-                  <Settings className="w-10 h-10 text-white" />
+                <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 bg-orange-500 rounded-xl sm:rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center shadow-[0_10px_30px_rgba(249,115,22,0.3)] sm:shadow-[0_20px_50px_rgba(249,115,22,0.3)]">
+                  <Settings className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-5xl font-black font-space-grotesk tracking-tighter text-white">System Settings</h2>
-                  <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] mt-2">Manage your high-res intelligence workspace</p>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black font-space-grotesk tracking-tighter text-white truncate">System Settings</h2>
+                  <p className="text-zinc-500 font-bold uppercase tracking-widest text-[8px] sm:text-[9px] md:text-[10px] mt-1 sm:mt-2">Manage your high-res intelligence workspace</p>
                 </div>
               </motion.div>
 
-              <div className="grid gap-8">
+              <div className="grid gap-3 sm:gap-4 md:gap-6 lg:gap-8">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="p-10 bg-white/5 border border-white/5 rounded-[3rem] backdrop-blur-3xl"
+                  className="p-5 sm:p-6 md:p-8 lg:p-10 bg-white/5 border border-white/5 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] lg:rounded-[3rem] backdrop-blur-3xl"
                 >
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-2xl font-black font-space-grotesk text-white">Profile Configuration</h3>
-                    <div className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-500 uppercase tracking-widest">Active Node</div>
+                  <div className="flex items-center justify-between mb-5 sm:mb-6 md:mb-8 gap-2">
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-black font-space-grotesk text-white truncate">Profile Configuration</h3>
+                    <div className="px-2.5 sm:px-3 md:px-4 py-1 sm:py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[8px] sm:text-[9px] md:text-[10px] font-black text-orange-500 uppercase tracking-widest shrink-0">Active Node</div>
                   </div>
 
-                  <div className="flex items-center gap-8 p-8 bg-black/40 rounded-[2rem] border border-white/5">
-                    <div className="w-24 h-24 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-full flex items-center justify-center text-3xl font-black text-white shadow-2xl">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 md:gap-8 p-4 sm:p-6 md:p-8 bg-black/40 rounded-xl sm:rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-full flex items-center justify-center text-2xl sm:text-2xl md:text-3xl font-black text-white shadow-2xl shrink-0">
                       {user.email?.[0].toUpperCase()}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-black text-zinc-500 uppercase tracking-widest mb-1">Identity</p>
-                      <p className="text-2xl font-bold text-white mb-2">{user.email}</p>
-                      <div className="flex items-center gap-4">
-                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">UID: {user.id.substring(0, 8)}...</p>
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <p className="text-[10px] font-bold text-green-500/80 uppercase tracking-widest">Verified Session</p>
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <p className="text-xs sm:text-sm font-black text-zinc-500 uppercase tracking-widest mb-1">Identity</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-2 truncate">{user.email}</p>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 md:gap-4">
+                        <p className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-zinc-600 uppercase tracking-widest truncate">UID: {user.id.substring(0, 8)}...</p>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                        <p className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-green-500/80 uppercase tracking-widest shrink-0">Verified Session</p>
                       </div>
                     </div>
                   </div>
@@ -447,17 +455,17 @@ export default function Dashboard() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-2 gap-8"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8"
                 >
-                  <div className="p-8 bg-white/5 border border-white/5 rounded-[2.5rem] backdrop-blur-3xl">
-                    <h4 className="text-lg font-black font-space-grotesk text-white mb-4">Workspace Privacy</h4>
-                    <p className="text-sm text-zinc-500 mb-6 leading-relaxed">Your data is encrypted end-to-end. Cognify AI processes metadata locally before sync.</p>
-                    <button className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:bg-white/10 transition-all">Export Local Log</button>
+                  <div className="p-5 sm:p-6 md:p-8 bg-white/5 border border-white/5 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] backdrop-blur-3xl">
+                    <h4 className="text-base sm:text-lg font-black font-space-grotesk text-white mb-3 sm:mb-4">Workspace Privacy</h4>
+                    <p className="text-xs sm:text-sm text-zinc-500 mb-4 sm:mb-5 md:mb-6 leading-relaxed">Your data is encrypted end-to-end. Cognify AI processes metadata locally before sync.</p>
+                    <button className="w-full py-3 sm:py-3.5 md:py-4 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:bg-white/10 transition-all">Export Local Log</button>
                   </div>
-                  <div className="p-8 bg-white/5 border border-white/5 rounded-[2.5rem] backdrop-blur-3xl">
-                    <h4 className="text-lg font-black font-space-grotesk text-white mb-4">Neural Preferences</h4>
-                    <p className="text-sm text-zinc-500 mb-6 leading-relaxed">Adjust AI extraction intensity and metadata depth for your resources.</p>
-                    <button className="w-full py-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl text-[10px] font-black text-orange-500 uppercase tracking-widest hover:bg-orange-500/20 transition-all">Configure AI</button>
+                  <div className="p-5 sm:p-6 md:p-8 bg-white/5 border border-white/5 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] backdrop-blur-3xl">
+                    <h4 className="text-base sm:text-lg font-black font-space-grotesk text-white mb-3 sm:mb-4">Neural Preferences</h4>
+                    <p className="text-xs sm:text-sm text-zinc-500 mb-4 sm:mb-5 md:mb-6 leading-relaxed">Adjust AI extraction intensity and metadata depth for your resources.</p>
+                    <button className="w-full py-3 sm:py-3.5 md:py-4 bg-orange-500/10 border border-orange-500/20 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-widest hover:bg-orange-500/20 transition-all">Configure AI</button>
                   </div>
                 </motion.div>
 
@@ -466,7 +474,7 @@ export default function Dashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
-                  className="w-full p-8 bg-red-500/5 border border-red-500/10 rounded-[3rem] text-red-500/60 font-black text-xl hover:bg-red-500 hover:text-white transition-all group overflow-hidden relative"
+                  className="w-full p-5 sm:p-6 md:p-8 bg-red-500/5 border border-red-500/10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] lg:rounded-[3rem] text-red-500/60 font-black text-base sm:text-lg md:text-xl hover:bg-red-500 hover:text-white transition-all group overflow-hidden relative"
                 >
                   <span className="relative z-10">Terminate Current Session</span>
                   <div className="absolute inset-0 bg-red-500 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
@@ -485,8 +493,8 @@ export default function Dashboard() {
                   layout
                   className={cn(
                     viewMode === 'grid'
-                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6"
-                      : "flex flex-col gap-4 max-w-4xl mx-auto"
+                      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6"
+                      : "flex flex-col gap-3 sm:gap-4 max-w-4xl mx-auto"
                   )}
                 >
                   {filteredBookmarks.map((bookmark, index) => (
@@ -516,12 +524,12 @@ export default function Dashboard() {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
-              <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-8 shadow-inner">
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto px-4">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center mb-6 sm:mb-8 shadow-inner">
                 <Sparkles className="w-10 h-10 text-zinc-400" />
               </div>
-              <h2 className="text-2xl font-bold mb-3 font-space-grotesk">No inspiration yet</h2>
-              <p className="text-zinc-500 mb-10 leading-relaxed">
+              <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 font-space-grotesk">No inspiration yet</h2>
+              <p className="text-sm sm:text-base text-zinc-500 mb-6 sm:mb-10 leading-relaxed">
                 {searchQuery
                   ? "We couldn't find anything matching your search. Try a broader term."
                   : "Start building your God-level knowledge hub by adding your first resource."}

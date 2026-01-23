@@ -36,10 +36,10 @@ export const LandingHero = () => {
         </motion.div>
 
 
-        <div className="mb-10 text-center">
+        <div className="mb-10 text-center px-4">
           <BlurText
             text="Configure Your Digital Universe"
-            className="text-3xl md:text-5xl lg:text-6xl font-black font-space-grotesk tracking-tighter max-w-5xl mx-auto leading-[0.85] text-white whitespace-nowrap"
+            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-space-grotesk tracking-tighter max-w-5xl mx-auto leading-[0.95] md:leading-[0.85] text-white"
             delay={100}
             animateBy="words"
             direction="bottom"
@@ -50,8 +50,9 @@ export const LandingHero = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: 1 }}
-          className="text-base md:text-lg text-zinc-400 max-w-2xl mx-auto mb-16 leading-relaxed font-medium"
+          className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-2xl mx-auto mb-12 md:mb-16 leading-relaxed font-medium px-4"
         >
+
           Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with AI-powered organization.
         </motion.p>
 
@@ -59,10 +60,10 @@ export const LandingHero = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1, duration: 0.8 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-8"
+          className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 md:gap-8 px-4"
         >
-          <Link href="/login?mode=signup">
-            <button className="cssbuttons-io-button">
+          <Link href="/login?mode=signup" className="w-full sm:w-auto">
+            <button className="cssbuttons-io-button w-full sm:w-auto">
               Get started
               <div className="icon">
                 <svg
@@ -80,14 +81,14 @@ export const LandingHero = () => {
               </div>
             </button>
           </Link>
-          <button className="h-[2.8em] px-8 bg-transparent border border-white/20 rounded-[0.9em] font-medium text-white/90 text-[17px] hover:bg-white/5 hover:text-white transition-all backdrop-blur-sm tracking-wide">
+          <button className="w-full sm:w-auto h-[2.8em] px-6 sm:px-8 bg-transparent border border-white/20 rounded-[0.9em] font-medium text-white/90 text-[15px] sm:text-[17px] hover:bg-white/5 hover:text-white transition-all backdrop-blur-sm tracking-wide">
             Talk to Sales
           </button>
         </motion.div>
 
 
         {/* Hero Stats/Social Proof */}
-        <div className="mt-24 pt-12 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+        <div className="mt-16 md:mt-24 pt-8 md:pt-12 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-4xl mx-auto px-4">
           {[
             { label: 'Users', value: '50k+' },
             { label: 'Bookmarks Saved', value: '2M+' },
@@ -96,7 +97,7 @@ export const LandingHero = () => {
           ].map((stat, index) => (
             <div key={stat.label} className="text-center">
               <HyperText
-                className="text-2xl font-bold font-space-grotesk text-white inline-block"
+                className="text-xl sm:text-2xl font-bold font-space-grotesk text-white inline-block"
                 startOnView={true}
                 animateOnHover={false}
                 duration={1000}
@@ -104,7 +105,7 @@ export const LandingHero = () => {
               >
                 {stat.value}
               </HyperText>
-              <div className="text-xs uppercase tracking-widest text-zinc-500 font-bold mt-1">{stat.label}</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-500 font-bold mt-1">{stat.label}</div>
             </div>
           ))}
         </div>

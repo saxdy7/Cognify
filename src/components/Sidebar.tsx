@@ -15,6 +15,8 @@ interface SidebarProps {
   isFavorites?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 // Helper component for animated text
@@ -37,21 +39,35 @@ export function Sidebar({
   onAddContainer,
   isFavorites,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  isMobileOpen = false,
+  onMobileClose
 }: SidebarProps) {
   return (
-    <aside
-      className={cn(
-        "fixed left-0 top-0 h-screen z-40 flex flex-col bg-black border-r border-white/5 shadow-2xl transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-24" : "w-80"
+    <>
+      {/* Mobile Overlay */}
+      {isMobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-40"
+          onClick={onMobileClose}
+        />
       )}
-    >
-      <div className={cn("flex flex-col h-full", isCollapsed ? "p-4 items-center" : "p-10")}>
+
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-screen z-50 flex flex-col bg-black border-r border-white/5 shadow-2xl transition-all duration-300 ease-in-out",
+          "lg:z-40",
+          isCollapsed && "lg:w-24",
+          !isCollapsed && "lg:w-80",
+          isMobileOpen ? "w-80 translate-x-0" : "w-80 -translate-x-full lg:translate-x-0"
+        )}
+      >
+      <div className={cn("flex flex-col h-full", isCollapsed ? "p-4 items-center" : "p-6 lg:p-10")}>
         {/* Brand */}
-        <div className="flex items-center justify-between mb-14 w-full h-12">
-          <Link href="/" className={cn("flex items-center gap-4 group cursor-pointer", isCollapsed && "justify-center w-full")}>
-            <div className="w-12 h-12 bg-orange-500 rounded-[1.25rem] flex items-center justify-center shadow-[0_10px_30px_rgba(249,115,22,0.3)] group-hover:rotate-12 transition-transform duration-500 shrink-0">
-              <Sparkles className="w-7 h-7 text-white" />
+        <div className="flex items-center justify-between mb-10 lg:mb-14 w-full h-12">
+          <Link href="/" className={cn("flex items-center gap-4 group cursor-pointer", isCollapsed && "lg:justify-center lg:w-full")}>
+            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-500 rounded-[1rem] lg:rounded-[1.25rem] flex items-center justify-center shadow-[0_10px_30px_rgba(249,115,22,0.3)] group-hover:rotate-12 transition-transform duration-500 shrink-0">
+              <Sparkles className="w-6 h-6 lg:w-7 lg:h-7 text-white" />
             </div>
             <AnimatePresence mode="wait">
               {!isCollapsed && (
@@ -75,7 +91,7 @@ export function Sidebar({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0 }}
                 onClick={onToggleCollapse}
-                className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-white transition-colors"
+                className="hidden lg:flex w-8 h-8 items-center justify-center text-zinc-500 hover:text-white transition-colors"
                 title="Collapse Sidebar"
               >
                 <PanelLeftClose className="w-5 h-5" />
@@ -85,7 +101,7 @@ export function Sidebar({
         </div>
 
         {/* Main Nav */}
-        <nav className="space-y-2 mb-14 w-full">
+        <nav className="space-y-2 mb-10 lg:mb-14 w-full">
           <AnimatePresence>
             {!isCollapsed && (
               <motion.p
@@ -268,5 +284,6 @@ export function Sidebar({
         </div>
       </div>
     </aside>
+    </>
   );
 }

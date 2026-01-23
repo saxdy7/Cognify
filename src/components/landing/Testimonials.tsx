@@ -31,8 +31,8 @@ const testimonials = [
 
 export const LandingTestimonials = () => {
     return (
-        <section id="testimonials" className="py-32 bg-zinc-950 relative overflow-hidden">
-            <div className="container px-6 mx-auto relative z-10">
+        <section id="testimonials" className="py-16 md:py-24 lg:py-32 bg-zinc-950 relative overflow-hidden">
+            <div className="container px-4 sm:px-6 mx-auto relative z-10">
                 <div className="max-w-4xl mb-20 text-center mx-auto">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -63,7 +63,7 @@ export const LandingTestimonials = () => {
                     </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                     {testimonials.map((testimonial, index) => (
                         <motion.div
                             key={testimonial.name}

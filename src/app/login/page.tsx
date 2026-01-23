@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, Mail, Lock, ArrowRight, Loader2, Github, AlertCircle } from 'lucide-react';
+import { Sparkles, Mail, Lock, ArrowRight, Loader2, Github, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { EnergyBeam } from '@/components/ui/energy-beam';
 
@@ -18,6 +18,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (modeParam === 'signup') setMode('signup');
@@ -122,13 +123,20 @@ function LoginForm() {
             <div className="relative">
               <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-14 pr-6 py-4 bg-zinc-100/50 dark:bg-zinc-900/50 border border-transparent focus:border-black dark:focus:border-white rounded-2xl outline-none transition-all"
+                className="w-full pl-14 pr-14 py-4 bg-zinc-100/50 dark:bg-zinc-900/50 border border-transparent focus:border-black dark:focus:border-white rounded-2xl outline-none transition-all"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 
