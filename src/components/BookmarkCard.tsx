@@ -69,7 +69,7 @@ export function BookmarkCard({ bookmark, onEdit, onDelete, onToggleFavorite, onT
         </div>
 
         {/* List View Actions */}
-        <div className="flex items-center gap-1 sm:gap-2 opacity-0 sm:group-hover:opacity-100 sm:transition-opacity px-2 sm:px-4">
+        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           {bookmark.tags?.slice(0, 2).map(tag => (
             <span key={tag} className="hidden md:inline-block px-2 py-1 bg-white/5 rounded-full text-[10px] font-medium text-zinc-400">
               #{tag}
