@@ -1,6 +1,6 @@
 # Cognify - High-Res Knowledge Hub
 
-Cognify is a "God-level" dashboard for organizing digital resources, built with **Next.js**, **Tailwind CSS**, and **Supabase**. It features a spatial organization system with a premium, dynamic interface.
+Cognify is a "God-level" dashboard for organizing digital resources, built with **Next.js**, **Tailwind CSS**, and **Supabase**. It features a spatial organization system with a premium, dynamic interface..
 
 ## 🚀 Key Features
 
