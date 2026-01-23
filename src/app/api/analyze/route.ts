@@ -34,8 +34,15 @@ export async function POST(request: Request) {
     const domain = validUrl.hostname;
 
     // Smart Logo Detection - Safe Access Fix
-    const ogImage = Array.isArray(metadata.ogImage) ? metadata.ogImage[0] : metadata.ogImage;
-    const ogImageUrl = typeof ogImage === 'object' ? ogImage?.url : ogImage;
+    let ogImageUrl: string | undefined;
+    if (Array.isArray(metadata.ogImage)) {
+      const firstImage = metadata.ogImage[0];
+      ogImageUrl = typeof firstImage === 'object' && firstImage !== null ? firstImage.url : firstImage;
+    } else if (metadata.ogImage && typeof metadata.ogImage === 'object') {
+      ogImageUrl = (metadata.ogImage as any).url;
+    } else {
+      ogImageUrl = metadata.ogImage as string | undefined;
+    }
 
     let logo_url = ogImageUrl || metadata.favicon;
 
