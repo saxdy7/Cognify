@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { extractOpenGraphAsync } from '@devmehq/open-graph-extractor';
-// Force Git Update 2026-01-22
+// Force Git Update 2026-01-23 - TypeScript fix
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();
