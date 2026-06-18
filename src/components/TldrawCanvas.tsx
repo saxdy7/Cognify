@@ -322,52 +322,96 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden flex flex-col bg-zinc-950">
-      {/* Visual Overlay Header */}
-      <div className="absolute top-4 left-4 z-[9999] flex items-center gap-3">
-        <button
-          onClick={onBackToBoards}
-          className="flex items-center gap-2 px-4 py-2.5 bg-black/80 hover:bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer font-bold text-xs uppercase tracking-wider"
-          title="Back to boards catalog"
-        >
-          <ArrowLeft className="w-4 h-4 text-rose-500" />
-          <span>Catalog</span>
-        </button>
+    <div 
+      ref={containerRef} 
+      className={`w-full h-full relative overflow-hidden flex flex-col transition-all duration-300 ${
+        theme === 'dark' ? 'bg-zinc-950 text-zinc-100' : 'bg-white text-zinc-900'
+      }`}
+    >
+      {/* Sub-Header Bar (replaces the absolute overlay to prevent clashing with Tldraw UI) */}
+      <div 
+        className={`w-full h-14 px-4 flex items-center justify-between border-b shrink-0 select-none z-[100] transition-colors duration-200 ${
+          theme === 'dark' 
+            ? 'bg-zinc-950/90 border-zinc-800/80 text-zinc-100' 
+            : 'bg-zinc-50/90 border-zinc-200/80 text-zinc-900'
+        } backdrop-blur-md`}
+      >
+        {/* Left: Back to catalog + Board Title + Sync Badge */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBackToBoards}
+            className={`flex items-center gap-2 px-3.5 py-1.5 border rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer ${
+              theme === 'dark'
+                ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white shadow-lg'
+                : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'
+            }`}
+            title="Back to boards catalog"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-rose-500" />
+            <span>Catalog</span>
+          </button>
 
-        {/* Sync Status Badge */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-black/80 border border-white/10 rounded-xl shadow-2xl backdrop-blur-md text-[10px] font-black uppercase tracking-wider">
-          <div className={`w-2 h-2 rounded-full ${
-            savingStatus === 'synced' ? 'bg-emerald-500 animate-pulse' :
-            savingStatus === 'saving' ? 'bg-amber-500 animate-spin' : 'bg-red-500'
-          }`} />
-          <span className={savingStatus === 'synced' ? 'text-zinc-400' : 'text-white'}>
-            {savingStatus === 'synced' && 'Vault Synced'}
-            {savingStatus === 'saving' && 'Syncing...'}
-            {savingStatus === 'error' && 'Sync Error'}
+          <div className="h-4 w-px bg-zinc-800/50 dark:bg-zinc-200/20" />
+
+          {/* Board Title */}
+          <span className="text-xs font-black uppercase tracking-wider font-space-grotesk truncate max-w-[150px] sm:max-w-[250px]">
+            {board.name}
           </span>
+
+          <div className="h-4 w-px bg-zinc-800/50 dark:bg-zinc-200/20" />
+
+          {/* Sync Status Badge */}
+          <div 
+            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-[10px] font-black uppercase tracking-wider ${
+              theme === 'dark'
+                ? 'bg-zinc-900/40 border-white/10 text-zinc-400'
+                : 'bg-zinc-100/50 border-zinc-200/85 text-zinc-500'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              savingStatus === 'synced' ? 'bg-emerald-500 animate-pulse' :
+              savingStatus === 'saving' ? 'bg-amber-500 animate-spin' : 'bg-red-500'
+            }`} />
+            <span>
+              {savingStatus === 'synced' && 'Vault Synced'}
+              {savingStatus === 'saving' && 'Syncing...'}
+              {savingStatus === 'error' && 'Sync Error'}
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Fullscreen + Theme Toggles */}
+        <div className="flex items-center gap-2">
+          {/* Fullscreen Button */}
+          <button
+            onClick={toggleFullscreen}
+            className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-all active:scale-95 cursor-pointer ${
+              theme === 'dark'
+                ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white shadow-lg'
+                : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'
+            }`}
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-all active:scale-95 cursor-pointer ${
+              theme === 'dark'
+                ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white shadow-lg'
+                : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'
+            }`}
+            title="Toggle Canvas Theme"
+          >
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-blue-400" />}
+          </button>
         </div>
       </div>
 
-      {/* Floating Controls */}
-      <div className="absolute top-4 right-4 z-[9999] flex items-center gap-2">
-        <button
-          onClick={toggleFullscreen}
-          className="w-11 h-11 flex items-center justify-center bg-black/80 hover:bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
-          title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-        >
-          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-        </button>
-        <button
-          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="w-11 h-11 flex items-center justify-center bg-black/80 hover:bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
-          title="Toggle Canvas Theme"
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
-        </button>
-      </div>
-
       {/* Tldraw infinite canvas mount */}
-      <div className="flex-1 w-full h-full">
+      <div className="flex-1 w-full h-full relative">
         <Tldraw
           onMount={handleMount}
           autoFocus={true}
