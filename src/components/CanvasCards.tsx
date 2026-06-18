@@ -81,6 +81,7 @@ function getMediaEmbedInfo(url: string): MediaEmbed | null {
 interface CanvasCardProps {
   element: CanvasElement;
   theme?: 'light' | 'dark';
+  isSelected?: boolean;
   onDrag: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
@@ -105,6 +106,7 @@ const PASTEL_COLORS = [
 export function CanvasCard({
   element,
   theme = 'light',
+  isSelected = false,
   onDrag,
   onDragEnd,
   onResize,
@@ -124,6 +126,10 @@ export function CanvasCard({
 
   // Dragging reference
   const dragRef = useRef<HTMLDivElement>(null);
+
+  const isBorderless = element.type === 'text' || 
+                       (element.type === 'image' && !!element.content.src) ||
+                       (element.type === 'link' && !!getMediaEmbedInfo(element.content.url));
 
   // Resize handler
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -276,7 +282,7 @@ export function CanvasCard({
         return (
           <div className="flex flex-col h-full pointer-events-auto">
             {element.content.src ? (
-              <div className="flex-1 relative group rounded-lg overflow-hidden flex flex-col bg-black">
+              <div className="flex-1 relative group rounded-3xl overflow-hidden flex flex-col bg-black">
                 {isVideo ? (
                   <video
                     src={element.content.src}
@@ -284,13 +290,13 @@ export function CanvasCard({
                     loop
                     muted
                     playsInline
-                    className="flex-1 w-full object-cover min-h-0 rounded-lg"
+                    className="flex-1 w-full object-cover min-h-0 rounded-3xl"
                   />
                 ) : (
                   <img
                     src={element.content.src}
                     alt={element.content.caption || 'Canvas Image'}
-                    className="flex-1 w-full object-cover min-h-0 rounded-lg"
+                    className="flex-1 w-full object-cover min-h-0 rounded-3xl"
                   />
                 )}
                 <input
@@ -349,7 +355,7 @@ export function CanvasCard({
         return (
           <div className="flex flex-col h-full pointer-events-auto">
             {media ? (
-              <div className="flex-1 rounded-xl overflow-hidden relative w-full h-full bg-black border border-zinc-200/20">
+              <div className="flex-1 rounded-3xl overflow-hidden relative w-full h-full bg-black border border-zinc-200/20">
                 {media.type === 'video' ? (
                   <video
                     src={media.embedUrl}
@@ -358,12 +364,12 @@ export function CanvasCard({
                     muted
                     playsInline
                     controls
-                    className="w-full h-full object-cover rounded-xl"
+                    className="w-full h-full object-cover rounded-3xl"
                   />
                 ) : (
                   <iframe
                     src={media.embedUrl}
-                    className="w-full h-full border-0 rounded-xl"
+                    className="w-full h-full border-0 rounded-3xl"
                     allow="autoplay; encrypted-media; fullscreen"
                     allowFullScreen
                     scrolling="no"
@@ -584,30 +590,42 @@ export function CanvasCard({
       onDragEnd={(event, info) => {
         onDragEnd(element.id, element.x, element.y);
       }}
-      className={`absolute select-none pointer-events-auto rounded-3xl border transition-shadow duration-300 group ${
-        isConnectingSource 
-          ? 'ring-4 ring-indigo-500 border-indigo-500 scale-[1.03] shadow-2xl' 
-          : activeTool === 'connect' 
-            ? 'hover:ring-4 hover:ring-indigo-400 hover:border-indigo-400 hover:scale-[1.02] cursor-pointer'
-            : activeTool === 'delete'
-              ? 'hover:ring-4 hover:ring-red-400 hover:border-red-400 cursor-crosshair'
-              : 'hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] shadow-sm'
+      className={`absolute select-none pointer-events-auto rounded-3xl border transition-all duration-300 group ${
+        isSelected 
+          ? 'ring-4 ring-rose-500 border-rose-500 scale-[1.01] shadow-xl z-10'
+          : isConnectingSource 
+            ? 'ring-4 ring-indigo-500 border-indigo-500 scale-[1.03] shadow-2xl z-10' 
+            : activeTool === 'connect' 
+              ? 'hover:ring-4 hover:ring-indigo-400 hover:border-indigo-400 hover:scale-[1.02] cursor-pointer'
+              : activeTool === 'delete'
+                ? 'hover:ring-4 hover:ring-red-400 hover:border-red-400 cursor-crosshair'
+                : isBorderless
+                  ? '' 
+                  : 'hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] shadow-sm'
       }`}
       style={{
         left: element.x,
         top: element.y,
         width: element.width || 280,
         height: element.height || 180,
-        backgroundColor: element.type === 'text' 
+        backgroundColor: isBorderless
           ? 'transparent' 
-          : (theme === 'dark' 
-              ? (PASTEL_COLORS.find(c => c.value === element.color)?.darkValue || '#262626') 
-              : (element.color || '#FFFFFF')),
-        borderColor: element.type === 'text' 
-          ? 'transparent' 
-          : (theme === 'dark'
-              ? 'rgba(255,255,255,0.08)'
-              : (element.color === '#FFFFFF' ? 'rgba(0,0,0,0.06)' : 'transparent')),
+          : element.type === 'column'
+            ? (theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(235, 235, 238, 0.6)')
+            : (theme === 'dark' 
+                ? (PASTEL_COLORS.find(c => c.value === element.color)?.darkValue || '#262626') 
+                : (element.color || '#FFFFFF')),
+        borderColor: isSelected
+          ? undefined
+          : isBorderless
+            ? 'transparent' 
+            : element.type === 'column'
+              ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)')
+              : (theme === 'dark'
+                  ? 'rgba(255,255,255,0.08)'
+                  : (element.color === '#FFFFFF' ? 'rgba(0,0,0,0.06)' : 'transparent')),
+        backdropFilter: element.type === 'column' ? 'blur(12px)' : undefined,
+        WebkitBackdropFilter: element.type === 'column' ? 'blur(12px)' : undefined,
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -615,7 +633,7 @@ export function CanvasCard({
       }}
     >
       {/* Element wrapper */}
-      <div className="relative w-full h-full p-5 flex flex-col">
+      <div className={`relative w-full h-full flex flex-col ${isBorderless ? 'p-0' : 'p-5'}`}>
         {/* Color picker option trigger */}
         {element.type !== 'text' && element.type !== 'column' && activeTool === 'select' && (
           <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity">

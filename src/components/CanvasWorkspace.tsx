@@ -29,6 +29,8 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
   const [zoom, setZoom] = useState(1);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [activeTool, setActiveTool] = useState<'select' | 'connect' | 'delete'>('select');
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [pendingPlacement, setPendingPlacement] = useState<CanvasElement['type'] | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isFullscreen, setIsFullscreen] = useState(false);
   
@@ -144,6 +146,33 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     };
   }, [pan, zoom, elements, board.id, snapToGrid]);
 
+  // Global keydown handler to delete selected element with Delete / Backspace keys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl && (
+          activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.getAttribute('contenteditable') === 'true'
+        )
+      ) {
+        return;
+      }
+
+      if (selectedElementId && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        handleDeleteElement(selectedElementId);
+        setSelectedElementId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedElementId, elements]);
+
   const fetchBoardData = async () => {
     try {
       const { data: elementsData, error: elementsError } = await supabase
@@ -216,10 +245,37 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
   // Mouse Handlers for infinite canvas panning
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (pendingPlacement) {
+      if (
+        e.target === canvasRef.current || 
+        (e.target as HTMLElement).classList.contains('canvas-grid') ||
+        (e.target as HTMLElement).tagName === 'svg'
+      ) {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+          const clickX = (e.clientX - rect.left - pan.x) / zoom;
+          const clickY = (e.clientY - rect.top - pan.y) / zoom;
+          const defaultWidth = pendingPlacement === 'column' ? 320 : pendingPlacement === 'image' ? 320 : pendingPlacement === 'text' ? 240 : 280;
+          const defaultHeight = pendingPlacement === 'column' ? 500 : pendingPlacement === 'image' ? 240 : pendingPlacement === 'text' ? 60 : 180;
+          handleAddElement(pendingPlacement, { 
+            x: snapValue(clickX - defaultWidth / 2), 
+            y: snapValue(clickY - defaultHeight / 2) 
+          });
+          setPendingPlacement(null);
+        }
+      }
+      return;
+    }
+
     if (activeTool !== 'select') return;
-    if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-grid')) {
+    if (
+      e.target === canvasRef.current || 
+      (e.target as HTMLElement).classList.contains('canvas-grid') ||
+      (e.target as HTMLElement).tagName === 'svg'
+    ) {
       setIsPanning(true);
       dragStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      setSelectedElementId(null);
     }
   };
 
@@ -247,9 +303,37 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
   // Zooming Logic
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const scale = e.deltaY < 0 ? 1.05 : 0.95;
-    const nextZoom = Math.min(Math.max(zoom * scale, 0.25), 2.05);
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    // Mouse coordinates relative to the canvas container (viewport)
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const scale = e.deltaY < 0 ? 1.08 : 0.92;
+    const nextZoom = Math.min(Math.max(zoom * scale, 0.2), 3.0);
+    
+    // Calculate new pan so zoom centers on mouse
+    const newPanX = mouseX - (mouseX - pan.x) * (nextZoom / zoom);
+    const newPanY = mouseY - (mouseY - pan.y) * (nextZoom / zoom);
+
     setZoom(parseFloat(nextZoom.toFixed(2)));
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+  };
+
+  const zoomAtCenter = (zoomIn: boolean) => {
+    const scale = zoomIn ? 1.15 : 0.85;
+    const nextZoom = Math.min(Math.max(zoom * scale, 0.2), 3.0);
+    
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const centerX = rect ? rect.width / 2 : window.innerWidth / 2;
+    const centerY = rect ? rect.height / 2 : window.innerHeight / 2;
+
+    const newPanX = centerX - (centerX - pan.x) * (nextZoom / zoom);
+    const newPanY = centerY - (centerY - pan.y) * (nextZoom / zoom);
+
+    setZoom(parseFloat(nextZoom.toFixed(2)));
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
   };
 
   // Grid Snapping
@@ -441,6 +525,8 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
       }
     } else if (activeTool === 'delete') {
       handleDeleteElement(id);
+    } else if (activeTool === 'select') {
+      setSelectedElementId(id);
     }
   };
 
@@ -456,11 +542,24 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
   return (
     <div className={`overflow-hidden transition-colors duration-300 ${
       isFullscreen 
-        ? 'fixed inset-0 z-50 w-screen h-screen bg-[#F4F4F0] dark:bg-[#1A1A1A]' 
+        ? 'fixed inset-0 z-[9999] w-screen h-screen bg-[#F4F4F0] dark:bg-[#1A1A1A]' 
         : 'relative w-full h-[calc(100vh-120px)] rounded-[2.5rem] border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner'
     } ${
       theme === 'dark' ? 'bg-[#1A1A1A] text-white' : 'bg-[#F4F4F0] text-zinc-900'
     }`}>
+      {/* Floating placement indicator banner */}
+      {pendingPlacement && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-3 px-5 py-2.5 bg-rose-500 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-2xl border border-rose-400/20 backdrop-blur-md animate-bounce">
+          <span>Tap canvas to place {pendingPlacement}</span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); setPendingPlacement(null); }}
+            className="p-1 bg-white/20 hover:bg-white/40 rounded-full transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* 2D Canvas Viewport */}
       <div 
         ref={canvasRef}
@@ -470,7 +569,11 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
         onWheel={handleWheel}
         onMouseEnter={() => { isMouseOverCanvasRef.current = true; }}
         onMouseLeave={() => { isMouseOverCanvasRef.current = false; }}
-        className="w-full h-full relative cursor-grab active:cursor-grabbing overflow-hidden"
+        className={`w-full h-full relative overflow-hidden ${
+          pendingPlacement 
+            ? 'cursor-crosshair' 
+            : 'cursor-grab active:cursor-grabbing'
+        }`}
         style={{
           backgroundImage: theme === 'dark'
             ? 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)'
@@ -516,63 +619,64 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
           {/* Cards Layer */}
           <div className="absolute inset-0 pointer-events-auto">
-            {elements.map(el => (
-              <CanvasCard
-                key={el.id}
-                element={el}
-                theme={theme}
-                onDrag={handleDragElement}
-                onDragEnd={handleDragElementEnd}
-                onResize={handleResizeElement}
-                onUpdate={handleUpdateElement}
-                onDelete={handleDeleteElement}
-                onClick={handleElementClick}
-                isConnectingSource={connectSource === el.id}
-                activeTool={activeTool}
-              />
-            ))}
+             {elements.map(el => (
+               <CanvasCard
+                 key={el.id}
+                 element={el}
+                 theme={theme}
+                 isSelected={selectedElementId === el.id}
+                 onDrag={handleDragElement}
+                 onDragEnd={handleDragElementEnd}
+                 onResize={handleResizeElement}
+                 onUpdate={handleUpdateElement}
+                 onDelete={handleDeleteElement}
+                 onClick={handleElementClick}
+                 isConnectingSource={connectSource === el.id}
+                 activeTool={activeTool}
+               />
+             ))}
 
-            {/* Collaborative Real-time Cursors */}
-            {presenceCursors.map(cursor => (
-              <div
-                key={cursor.id}
-                className="absolute pointer-events-none transition-all duration-300 flex items-center gap-2"
-                style={{ left: cursor.x, top: cursor.y }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M5.65376 12.3963L16.2753 2.18322C17.0733 1.41595 18.3615 1.99617 18.3377 3.09939L18.1098 13.6826C18.0898 14.6148 17.0768 15.1764 16.299 14.6622L11.5976 11.5541L7.75508 15.3966C7.03901 16.1127 5.82025 15.5228 5.92723 14.5126L6.23078 11.646C6.2625 11.3465 6.06209 11.0664 5.76012 10.9634L2.88371 9.98238C1.86877 9.63623 1.95679 8.16335 3.01168 7.94639L10.3703 6.43265C10.7483 6.35489 11.0261 6.05927 11.0772 5.67496L11.5721 1.94423C11.6983 0.992688 12.9818 0.741093 13.4566 1.57469L19.4674 12.126C19.986 13.0363 19.3496 14.1812 18.3079 14.2057L5.75376 14.502L5.65376 12.3963Z" fill={cursor.color} />
-                </svg>
-                <div 
-                  className="px-2 py-1 rounded-md text-[10px] font-black text-white whitespace-nowrap shadow-md"
-                  style={{ backgroundColor: cursor.color }}
-                >
-                  {cursor.name}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+             {/* Collaborative Real-time Cursors */}
+             {presenceCursors.map(cursor => (
+               <div
+                 key={cursor.id}
+                 className="absolute pointer-events-none transition-all duration-300 flex items-center gap-2"
+                 style={{ left: cursor.x, top: cursor.y }}
+               >
+                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                   <path d="M5.65376 12.3963L16.2753 2.18322C17.0733 1.41595 18.3615 1.99617 18.3377 3.09939L18.1098 13.6826C18.0898 14.6148 17.0768 15.1764 16.299 14.6622L11.5976 11.5541L7.75508 15.3966C7.03901 16.1127 5.82025 15.5228 5.92723 14.5126L6.23078 11.646C6.2625 11.3465 6.06209 11.0664 5.76012 10.9634L2.88371 9.98238C1.86877 9.63623 1.95679 8.16335 3.01168 7.94639L10.3703 6.43265C10.7483 6.35489 11.0261 6.05927 11.0772 5.67496L11.5721 1.94423C11.6983 0.992688 12.9818 0.741093 13.4566 1.57469L19.4674 12.126C19.986 13.0363 19.3496 14.1812 18.3079 14.2057L5.75376 14.502L5.65376 12.3963Z" fill={cursor.color} />
+                 </svg>
+                 <div 
+                   className="px-2 py-1 rounded-md text-[10px] font-black text-white whitespace-nowrap shadow-md"
+                   style={{ backgroundColor: cursor.color }}
+                 >
+                   {cursor.name}
+                 </div>
+               </div>
+             ))}
+           </div>
+         </div>
+       </div>
 
-      {/* Floating Canvas Action Bar (Bottom-Left) */}
-      <div className="absolute bottom-6 left-6 z-20 flex items-center gap-1.5 p-1.5 bg-white/70 dark:bg-zinc-900/70 border border-white/20 dark:border-zinc-800/80 backdrop-blur-2xl rounded-2xl shadow-xl">
-        <button
-          onClick={() => setZoom(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))))}
-          className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-          title="Zoom Out"
-        >
-          <ZoomOut className="w-5 h-5" />
-        </button>
-        <span className="px-3 text-xs font-black text-zinc-600 dark:text-zinc-400 select-none">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          onClick={() => setZoom(prev => Math.min(2.0, parseFloat((prev + 0.1).toFixed(2))))}
-          className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-          title="Zoom In"
-        >
-          <ZoomIn className="w-5 h-5" />
-        </button>
+       {/* Floating Canvas Action Bar (Bottom-Left) */}
+       <div className="absolute bottom-6 left-6 z-20 flex items-center gap-1.5 p-1.5 bg-white/70 dark:bg-zinc-900/70 border border-white/20 dark:border-zinc-800/80 backdrop-blur-2xl rounded-2xl shadow-xl">
+         <button
+           onClick={() => zoomAtCenter(false)}
+           className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
+           title="Zoom Out"
+         >
+           <ZoomOut className="w-5 h-5" />
+         </button>
+         <span className="px-3 text-xs font-black text-zinc-600 dark:text-zinc-400 select-none">
+           {Math.round(zoom * 100)}%
+         </span>
+         <button
+           onClick={() => zoomAtCenter(true)}
+           className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
+           title="Zoom In"
+         >
+           <ZoomIn className="w-5 h-5" />
+         </button>
         <button
           onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); }}
           className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
@@ -674,8 +778,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
           <div className="flex flex-col items-center w-full gap-1 px-1">
             {/* Note Tool */}
             <button
-              onClick={() => handleAddElement('note')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('note'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'note' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Add Note Card"
             >
               <StickyNote className="w-5 h-5 text-yellow-500" />
@@ -684,8 +790,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
             {/* Link Tool */}
             <button
-              onClick={() => handleAddElement('link')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('link'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'link' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Embed Web Link"
             >
               <LinkIcon className="w-5 h-5 text-indigo-500" />
@@ -694,8 +802,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
             {/* To-Do Checklist */}
             <button
-              onClick={() => handleAddElement('todo')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('todo'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'todo' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Drop Checklist"
             >
               <CheckSquare className="w-5 h-5 text-amber-500" />
@@ -707,6 +817,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
               onClick={() => {
                 setActiveTool(activeTool === 'connect' ? 'select' : 'connect');
                 setConnectSource(null);
+                setPendingPlacement(null);
               }}
               className={`w-16 py-2 flex flex-col items-center gap-1 rounded-xl transition-all ${
                 activeTool === 'connect'
@@ -721,8 +832,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
             {/* Board Link (Nested sub-board) */}
             <button
-              onClick={() => handleAddElement('board_link')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('board_link'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'board_link' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Create Sub-Board"
             >
               <FolderOpen className="w-5 h-5 text-teal-500" />
@@ -731,8 +844,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
             {/* Kanban Column */}
             <button
-              onClick={() => handleAddElement('column')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('column'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'column' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Add Column Container"
             >
               <Columns className="w-5 h-5 text-purple-500" />
@@ -741,8 +856,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
             {/* Text Label */}
             <button
-              onClick={() => handleAddElement('text')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('text'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'text' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Add Text Label"
             >
               <Type className="w-5 h-5 text-blue-500" />
@@ -751,8 +868,10 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
             {/* Image Insertion */}
             <button
-              onClick={() => handleAddElement('image')}
-              className="w-16 py-2 flex flex-col items-center gap-1 text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
+              onClick={() => { setPendingPlacement('image'); setActiveTool('select'); }}
+              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
+                pendingPlacement === 'image' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
+              }`}
               title="Insert Image Card"
             >
               <ImageIcon className="w-5 h-5 text-emerald-500" />

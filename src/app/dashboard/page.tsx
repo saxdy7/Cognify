@@ -521,7 +521,7 @@ export default function Dashboard() {
 
         <div className="flex-1 p-4 sm:p-6 md:p-8 lg:p-12 overflow-y-auto custom-scrollbar">
           {/* View Toggle & Content Header */}
-          {selectedContainerId !== 'settings' && selectedContainerId !== 'notifications' && (
+          {selectedContainerId !== 'settings' && selectedContainerId !== 'notifications' && viewType !== 'canvas' && (
             <div className="flex items-center justify-end mb-4 sm:mb-6 md:mb-8 gap-2">
               <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-xl">
                 <button
