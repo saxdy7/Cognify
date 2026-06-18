@@ -286,9 +286,12 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
 
         if (error) throw error;
         setSavingStatus('synced');
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error auto-saving tldraw snapshot:', err);
         setSavingStatus('error');
+        toast.error('Autosave failed. Check connection or try reducing image file sizes.', {
+          id: 'canvas-save-error'
+        });
       }
     };
 
@@ -311,6 +314,45 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
       clearTimeout(timeoutId);
     };
   }, [editor, board.id]);
+
+  // 6. Custom Asset Store for Supabase Storage to prevent large base64 image strings from clogging the database
+  const assetStore = React.useMemo(() => ({
+    async upload(asset: any, file: File) {
+      try {
+        const fileExt = file.name.split('.').pop() || 'png';
+        const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+        const filePath = fileName;
+
+        // Upload to the public 'canvas-assets' Supabase Storage bucket
+        const { data, error } = await supabase.storage
+          .from('canvas-assets')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) throw error;
+
+        // Retrieve the public download/view URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('canvas-assets')
+          .getPublicUrl(filePath);
+
+        return {
+          src: publicUrl
+        };
+      } catch (err: any) {
+        console.error('Error uploading asset to Supabase storage:', err);
+        toast.error('Failed to upload image to vault storage: ' + (err.message || 'unknown error'), {
+          id: 'canvas-asset-error'
+        });
+        throw err;
+      }
+    },
+    resolve(asset: any) {
+      return asset.props.src;
+    }
+  }), [userId]);
 
   if (loading) {
     return (
@@ -415,6 +457,7 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
         <Tldraw
           onMount={handleMount}
           autoFocus={true}
+          assets={assetStore}
         />
       </div>
     </div>
