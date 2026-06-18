@@ -47,3 +47,40 @@ export interface Password {
   created_at: string;
   updated_at?: string;
 }
+
+export interface CanvasBoard {
+  id: string;
+  user_id: string;
+  name: string;
+  background_color: string;
+  is_dark_mode: boolean;
+  parent_board_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CanvasElement {
+  id: string;
+  board_id: string;
+  type: 'note' | 'image' | 'link' | 'file' | 'todo' | 'column' | 'board_link' | 'text';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+  content: any; // Dynamic properties depending on the element type
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CanvasConnector {
+  id: string;
+  board_id: string;
+  source_element_id: string;
+  target_element_id: string;
+  color: string;
+  label?: string;
+  style: 'straight' | 'curved';
+  created_at: string;
+}
+

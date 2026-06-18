@@ -9,10 +9,12 @@ import { MasonryGrid } from '@/components/MasonryGrid';
 import { MicroExpander } from '@/components/MicroExpander';
 import { AddBookmarkModal, AddContainerModal, EditBookmarkModal } from '@/components/Modals';
 import { AddPasswordModal, EditPasswordModal } from '@/components/PasswordModals';
+import { CanvasWorkspace } from '@/components/CanvasWorkspace';
+import { TemplateGallery } from '@/components/TemplateGallery';
 import { supabase } from '@/lib/supabase';
-import { Bookmark, Container, Notification, Password } from '@/types';
+import { Bookmark, Container, Notification, Password, CanvasBoard } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Plus, Sparkles, Settings, LogOut, Bell, CheckCircle, Info, AlertTriangle, ArrowRight, LayoutGrid, List, X } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Settings, LogOut, Bell, CheckCircle, Info, AlertTriangle, ArrowRight, LayoutGrid, List, X, Presentation, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -21,13 +23,15 @@ export default function Dashboard() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [passwords, setPasswords] = useState<Password[]>([]);
+  const [boards, setBoards] = useState<CanvasBoard[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<any>(null);
   const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
   const [selectedPassword, setSelectedPassword] = useState<Password | null>(null);
-  const [viewType, setViewType] = useState<'bookmarks' | 'passwords'>('bookmarks');
+  const [viewType, setViewType] = useState<'bookmarks' | 'passwords' | 'canvas'>('bookmarks');
   const router = useRouter();
 
   const [isAddBookmarkOpen, setIsAddBookmarkOpen] = useState(false);
@@ -114,14 +118,65 @@ export default function Dashboard() {
         toast.error('Failed to load passwords: ' + passwordsError.message);
       }
 
+      const { data: boardsData, error: boardsError } = await supabase
+        .from('canvas_boards')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (boardsError) {
+        console.error('Error fetching boards:', boardsError);
+        toast.error('Failed to load visual boards: ' + boardsError.message);
+      }
+
       setContainers(containersData || []);
       setBookmarks(bookmarksData || []);
       setPasswords(passwordsData || []);
+      setBoards(boardsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddBoard = async (name: string) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('canvas_boards')
+        .insert([{ name, user_id: user.id }])
+        .select();
+
+      if (error) throw error;
+      if (data) {
+        setBoards([data[0], ...boards]);
+        setSelectedBoardId(data[0].id);
+        toast.success('Visual workspace initialized');
+        addNotification('Workspace Created', `Successfully initialized visual board "${name}".`, 'success');
+      }
+    } catch (error) {
+      console.error('Error adding board:', error);
+      toast.error('Failed to initialize board');
+    }
+  };
+
+  const handleDeleteBoard = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('canvas_boards')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setBoards(boards.filter(b => b.id !== id));
+      if (selectedBoardId === id) setSelectedBoardId(null);
+      toast.success('Board permanently deleted');
+      addNotification('Board Purged', 'Visual board and all its nodes have been removed.', 'warning');
+    } catch (error) {
+      console.error('Error deleting board:', error);
+      toast.error('Failed to purge board');
     }
   };
 
@@ -378,6 +433,13 @@ export default function Dashboard() {
   });
 
   const getSelectedName = () => {
+    if (viewType === 'canvas') {
+      if (selectedBoardId === 'shared') return 'Shared Boards';
+      if (selectedBoardId === 'trash') return 'Trash / Archive';
+      if (selectedBoardId) return boards.find(b => b.id === selectedBoardId)?.name || 'Canvas Board';
+      return 'Visual Workspaces';
+    }
+
     if (viewType === 'passwords') {
       if (selectedContainerId === 'favorites') return 'Favorite Passwords';
       if (selectedContainerId === 'today') return 'Added Today';
@@ -419,6 +481,16 @@ export default function Dashboard() {
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
         viewType={viewType}
+        boards={boards}
+        selectedBoardId={selectedBoardId}
+        onSelectBoard={(id) => {
+          setSelectedBoardId(id);
+          setIsMobileSidebarOpen(false);
+        }}
+        onAddBoard={() => {
+          const name = prompt('Enter visual workspace name:');
+          if (name) handleAddBoard(name);
+        }}
       />
 
       <main className={cn(
@@ -427,7 +499,16 @@ export default function Dashboard() {
         !isSidebarCollapsed && "lg:ml-80"
       )}>
         <Header
-          onAddBookmark={viewType === 'bookmarks' ? () => setIsAddBookmarkOpen(true) : () => setIsAddPasswordOpen(true)}
+          onAddBookmark={
+            viewType === 'canvas' 
+              ? () => {
+                  const name = prompt('Enter visual workspace name:');
+                  if (name) handleAddBoard(name);
+                }
+              : viewType === 'bookmarks'
+                ? () => setIsAddBookmarkOpen(true)
+                : () => setIsAddPasswordOpen(true)
+          }
           onProfileClick={() => setSelectedContainerId('settings')}
           onNotificationsClick={() => setSelectedContainerId('notifications')}
           searchQuery={searchQuery}
@@ -621,6 +702,90 @@ export default function Dashboard() {
               <Loader2 className="w-8 h-8 animate-spin mb-4" />
               <p className="text-sm font-medium">Loading your Cognify hub...</p>
             </div>
+          ) : viewType === 'canvas' ? (
+            selectedBoardId ? (
+              <CanvasWorkspace
+                board={boards.find(b => b.id === selectedBoardId)!}
+                onBackToBoards={() => setSelectedBoardId(null)}
+                userId={user.id}
+              />
+            ) : (
+              <div className="max-w-[2000px] mx-auto pb-32">
+                {/* Visual Boards Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-black font-space-grotesk tracking-tighter text-white">Visual Workspaces</h2>
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-[9px] mt-1">Freeform infinite 2D canvas boards</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const name = prompt('Enter workspace name:');
+                      if (name) handleAddBoard(name);
+                    }}
+                    className="px-6 py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-orange-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all shadow-[0_4px_15px_rgba(244,63,94,0.3)] shrink-0 cursor-pointer"
+                  >
+                    New Board
+                  </button>
+                </div>
+
+                {boards.filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+                    {boards
+                      .filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((board) => (
+                        <div
+                          key={board.id}
+                          onClick={() => setSelectedBoardId(board.id)}
+                          className="group relative p-6 bg-white/5 border border-white/5 hover:border-rose-500/30 rounded-3xl backdrop-blur-3xl cursor-pointer hover:bg-white/[0.08] transition-all flex flex-col min-h-[160px]"
+                        >
+                          <div className="w-10 h-10 bg-rose-500/10 text-rose-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <Presentation className="w-5 h-5" />
+                          </div>
+                          <h3 className="text-base font-black text-white group-hover:text-rose-400 transition-colors line-clamp-1 mb-1">{board.name}</h3>
+                          <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-6">
+                            Created {new Date(board.created_at).toLocaleDateString()}
+                          </span>
+                          
+                          <div className="mt-auto flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase text-rose-500 tracking-wider flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                              Open Board <ArrowRight className="w-3.5 h-3.5" />
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Are you sure you want to delete "${board.name}"?`)) {
+                                  handleDeleteBoard(board.id);
+                                }
+                              }}
+                              className="p-1.5 bg-white/5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                              title="Delete Board"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-16 border border-dashed border-white/5 rounded-[2.5rem] bg-white/[0.01] mb-12">
+                    <Presentation className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+                    <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-2">No boards found</h3>
+                    <p className="text-xs text-zinc-600 font-medium max-w-xs mx-auto">Initialize a visual workspace above or use a creative template design below.</p>
+                  </div>
+                )}
+
+                {/* Templates Section */}
+                <div className="border-t border-white/5 pt-12">
+                  <TemplateGallery
+                    userId={user.id}
+                    onBoardCreated={(boardId) => {
+                      fetchData(user.id);
+                      setSelectedBoardId(boardId);
+                    }}
+                  />
+                </div>
+              </div>
+            )
           ) : viewType === 'passwords' ? (
             // Password View
             filteredPasswords.length > 0 ? (
