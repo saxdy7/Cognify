@@ -19,6 +19,11 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (modeParam === 'signup') setMode('signup');
@@ -70,6 +75,10 @@ function LoginForm() {
     }
   };
 
+  if (!mounted) {
+    return <Loader2 className="w-10 h-10 animate-spin text-zinc-400" />;
+  }
+
   return (
     <div className="w-full max-w-md">
       <motion.div
@@ -113,6 +122,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
+                suppressHydrationWarning
                 className="w-full pl-14 pr-6 py-4 bg-zinc-100/50 dark:bg-zinc-900/50 border border-transparent focus:border-black dark:focus:border-white rounded-2xl outline-none transition-all"
               />
             </div>
@@ -128,11 +138,13 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                suppressHydrationWarning
                 className="w-full pl-14 pr-14 py-4 bg-zinc-100/50 dark:bg-zinc-900/50 border border-transparent focus:border-black dark:focus:border-white rounded-2xl outline-none transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                suppressHydrationWarning
                 className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -143,6 +155,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
+            suppressHydrationWarning
             className="w-full py-5 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-bold flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
           >
             {loading ? (
@@ -167,6 +180,7 @@ function LoginForm() {
 
         <button
           onClick={handleGithubLogin}
+          suppressHydrationWarning
           className="w-full py-5 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
         >
           <Github className="w-6 h-6" />
@@ -177,6 +191,7 @@ function LoginForm() {
           {mode === 'login' ? "Don't have an account?" : "Already have an account?"}{' '}
           <button
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            suppressHydrationWarning
             className="text-black dark:text-white font-bold hover:underline"
           >
             {mode === 'login' ? 'Sign up' : 'Log in'}

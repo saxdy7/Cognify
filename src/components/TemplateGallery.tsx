@@ -82,60 +82,22 @@ export function TemplateGallery({ userId, onBoardCreated }: TemplateGalleryProps
   const handleUseTemplate = async (template: Template) => {
     toast.info(`Initializing "${template.name}" template...`);
     try {
-      // 1. Create the Board
+      // Create the Board with a special tldraw template bootstrap payload
       const { data: boardData, error: boardError } = await supabase
         .from('canvas_boards')
         .insert([{
           user_id: userId,
           name: template.name,
-          background_color: '#F4F4F0'
+          background_color: '#F4F4F0',
+          tldraw_snapshot: {
+            isNewTemplate: true,
+            templateId: template.id
+          }
         }])
         .select();
 
       if (boardError) throw boardError;
       const boardId = boardData[0].id;
-
-      // 2. Insert Elements
-      const elementIdMap: { [key: string]: string } = {};
-      for (let i = 0; i < template.elements.length; i++) {
-        const el = template.elements[i];
-        const { id, ...elPayload } = el; // extract mock temp id if exists
-        
-        const { data: createdEl, error: elError } = await supabase
-          .from('canvas_elements')
-          .insert([{
-            board_id: boardId,
-            ...elPayload
-          }])
-          .select();
-
-        if (elError) throw elError;
-        
-        if (id) {
-          elementIdMap[id] = createdEl[0].id;
-        } else {
-          elementIdMap[i.toString()] = createdEl[0].id;
-        }
-      }
-
-      // 3. Insert Connectors if brainstorm map template
-      if (template.connectors && template.connectors.length > 0) {
-        for (const conn of template.connectors) {
-          const sourceId = elementIdMap[conn.sourceIndex === 0 ? 'core' : conn.sourceIndex === 1 ? 'idea1' : 'idea2'];
-          const targetId = elementIdMap[conn.targetIndex === 0 ? 'core' : conn.targetIndex === 1 ? 'idea1' : 'idea2'];
-
-          if (sourceId && targetId) {
-            await supabase
-              .from('canvas_connectors')
-              .insert([{
-                board_id: boardId,
-                source_element_id: sourceId,
-                target_element_id: targetId,
-                color: conn.color
-              }]);
-          }
-        }
-      }
 
       toast.success('Visual workspace populated!');
       onBoardCreated(boardId);

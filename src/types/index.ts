@@ -55,6 +55,7 @@ export interface CanvasBoard {
   background_color: string;
   is_dark_mode: boolean;
   parent_board_id?: string;
+  tldraw_snapshot?: any;
   created_at: string;
   updated_at: string;
 }
