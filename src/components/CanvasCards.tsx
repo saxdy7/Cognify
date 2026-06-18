@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Check, CheckSquare, Plus, Trash2, Link as LinkIcon, 
   ExternalLink, FileText, Download, ArrowRight, Palette, 
@@ -9,6 +8,7 @@ import {
 } from 'lucide-react';
 import { CanvasElement } from '@/types';
 import { toast } from 'sonner';
+
 interface MediaEmbed {
   type: 'youtube' | 'instagram' | 'vimeo' | 'video';
   embedUrl: string;
@@ -18,7 +18,7 @@ function getMediaEmbedInfo(url: string): MediaEmbed | null {
   if (!url) return null;
   const lowerUrl = url.toLowerCase().trim();
 
-  // 1. YouTube Matches (e.g. youtube.com/watch?v=..., youtu.be/...)
+  // 1. YouTube Matches
   let youtubeId = '';
   if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -39,7 +39,7 @@ function getMediaEmbedInfo(url: string): MediaEmbed | null {
     };
   }
 
-  // 2. Instagram Matches (e.g. instagram.com/p/..., instagram.com/reel/...)
+  // 2. Instagram Matches
   if (lowerUrl.includes('instagram.com/p/') || lowerUrl.includes('instagram.com/reel/')) {
     const match = url.match(/instagram\.com\/(p|reel)\/([^/]+)/);
     if (match) {
@@ -51,7 +51,7 @@ function getMediaEmbedInfo(url: string): MediaEmbed | null {
     }
   }
 
-  // 3. Vimeo Matches (e.g. vimeo.com/...)
+  // 3. Vimeo Matches
   if (lowerUrl.includes('vimeo.com')) {
     const match = url.match(/vimeo\.com\/(\d+)/);
     if (match) {
@@ -78,9 +78,11 @@ function getMediaEmbedInfo(url: string): MediaEmbed | null {
 
   return null;
 }
+
 interface CanvasCardProps {
   element: CanvasElement;
   theme?: 'light' | 'dark';
+  zoom?: number;
   isSelected?: boolean;
   onDrag: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
@@ -106,6 +108,7 @@ const PASTEL_COLORS = [
 export function CanvasCard({
   element,
   theme = 'light',
+  zoom = 1,
   isSelected = false,
   onDrag,
   onDragEnd,
@@ -117,25 +120,90 @@ export function CanvasCard({
   activeTool
 }: CanvasCardProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const resizeStartRef = useRef({ w: 0, h: 0, x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
   // Custom free image search states
   const [imageSearch, setImageSearch] = useState('');
   const [isSearchingImages, setIsSearchingImages] = useState(false);
 
-  // Dragging reference
-  const dragRef = useRef<HTMLDivElement>(null);
+  // Manual drag state
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, elX: 0, elY: 0 });
+  const hasDraggedRef = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Resize state
+  const isResizingRef = useRef(false);
+  const resizeStartRef = useRef({ w: 0, h: 0, x: 0, y: 0 });
 
   const isBorderless = element.type === 'text' || 
                        (element.type === 'image' && !!element.content.src) ||
                        (element.type === 'link' && !!getMediaEmbedInfo(element.content.url));
 
-  // Resize handler
+  // ─── Manual Drag (zoom-aware) ───
+  const handleCardMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't start drag on inputs, textareas, buttons, or contenteditable
+    const target = e.target as HTMLElement;
+    const tag = target.tagName;
+    if (
+      tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A' ||
+      tag === 'LABEL' || tag === 'SELECT' || tag === 'IFRAME' || tag === 'VIDEO' ||
+      target.isContentEditable ||
+      target.closest('button') || target.closest('a') || target.closest('label') ||
+      target.closest('iframe') || target.closest('video') ||
+      target.dataset.resizeHandle === 'true'
+    ) {
+      return;
+    }
+
+    if (activeTool !== 'select') return;
+
+    e.stopPropagation();
+    e.preventDefault();
+
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      elX: element.x,
+      elY: element.y
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      
+      const deltaX = (moveEvent.clientX - dragStartRef.current.mouseX) / zoom;
+      const deltaY = (moveEvent.clientY - dragStartRef.current.mouseY) / zoom;
+      
+      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+        hasDraggedRef.current = true;
+      }
+
+      const newX = dragStartRef.current.elX + deltaX;
+      const newY = dragStartRef.current.elY + deltaY;
+      onDrag(element.id, newX, newY);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      if (hasDraggedRef.current) {
+        onDragEnd(element.id, element.x, element.y);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [element.id, element.x, element.y, zoom, activeTool, onDrag, onDragEnd]);
+
+  // ─── Resize handler ───
   const handleResizeStart = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    setIsResizing(true);
+    isResizingRef.current = true;
     resizeStartRef.current = {
       w: element.width || 280,
       h: element.height || 180,
@@ -144,15 +212,15 @@ export function CanvasCard({
     };
 
     const handleResizeMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - resizeStartRef.current.x;
-      const deltaY = moveEvent.clientY - resizeStartRef.current.y;
-      const newWidth = Math.max(160, resizeStartRef.current.w + deltaX);
-      const newHeight = Math.max(80, resizeStartRef.current.h + deltaY);
+      const deltaX = (moveEvent.clientX - resizeStartRef.current.x) / zoom;
+      const deltaY = (moveEvent.clientY - resizeStartRef.current.y) / zoom;
+      const newWidth = Math.max(140, resizeStartRef.current.w + deltaX);
+      const newHeight = Math.max(60, resizeStartRef.current.h + deltaY);
       onResize(element.id, newWidth, newHeight);
     };
 
     const handleResizeEnd = () => {
-      setIsResizing(false);
+      isResizingRef.current = false;
       window.removeEventListener('mousemove', handleResizeMove);
       window.removeEventListener('mouseup', handleResizeEnd);
     };
@@ -161,27 +229,25 @@ export function CanvasCard({
     window.addEventListener('mouseup', handleResizeEnd);
   };
 
-  // Free image selection simulation (Uses high-quality free placeholders)
+  // Free image search
   const handleSearchFreeImages = (query: string) => {
     if (!query) return;
     setIsSearchingImages(true);
     setTimeout(() => {
-      // Simulate search and pull a high-res royalty-free Unsplash/Pexels image matching query
-      const encodedQuery = encodeURIComponent(query);
       const randomId = Math.floor(Math.random() * 1000);
       const sourceUrl = `https://images.unsplash.com/photo-${randomId % 2 === 0 ? '1507525428034-b723cf961d3e' : '1498050108023-c5249f4df085'}?auto=format&fit=crop&w=600&q=80&sig=${randomId}`;
       onUpdate(element.id, {
-        content: { ...element.content, src: sourceUrl, caption: `Free image search: "${query}"` }
+        content: { ...element.content, src: sourceUrl, caption: `Free image: "${query}"` }
       });
       setIsSearchingImages(false);
-      toast.success('Free royalty-free image inserted successfully');
+      toast.success('Free image inserted');
     }, 1000);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      toast.success(`File "${file.name}" uploaded successfully (Simulated)`);
+      toast.success(`File "${file.name}" uploaded`);
       onUpdate(element.id, {
         content: {
           ...element.content,
@@ -208,17 +274,17 @@ export function CanvasCard({
           onUpdate(element.id, {
             content: { ...element.content, src: base64Url, caption: file.name }
           });
-          toast.success(file.type.startsWith('video/') ? 'Video uploaded successfully' : 'Image uploaded successfully');
+          toast.success(file.type.startsWith('video/') ? 'Video uploaded' : 'Image uploaded');
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Mock Link metadata parser
+  // Link metadata parser
   const handleLoadLinkPreview = (url: string) => {
     if (!url) return;
-    toast.info('Fetching Link Preview...');
+    toast.info('Fetching preview...');
     setTimeout(() => {
       let hostname = 'website.com';
       try {
@@ -227,17 +293,17 @@ export function CanvasCard({
       onUpdate(element.id, {
         content: {
           url,
-          title: `Creative Inspiration from ${hostname}`,
+          title: `${hostname}`,
           description: 'A shared visual board curated with mood boards, checklist logs, and visual summaries.',
           image: `https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=400&q=80`,
           favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
         }
       });
-      toast.success('Link preview loaded!');
+      toast.success('Preview loaded');
     }, 1200);
   };
 
-  // Render card specifics
+  // ─── Card content renderers ───
   const renderCardContent = () => {
     switch (element.type) {
       case 'note':
@@ -248,13 +314,19 @@ export function CanvasCard({
               value={element.content.title || ''}
               onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
               placeholder="Note Title"
-              className="w-full bg-transparent font-space-grotesk font-black text-sm outline-none border-b border-zinc-200/50 dark:border-zinc-800/50 pb-1.5 mb-2 text-zinc-900 dark:text-zinc-100"
+              className={`w-full bg-transparent font-semibold text-sm outline-none pb-1.5 mb-2 ${
+                theme === 'dark' 
+                  ? 'text-zinc-100 border-b border-zinc-700/40 placeholder:text-zinc-600' 
+                  : 'text-zinc-800 border-b border-zinc-200/60 placeholder:text-zinc-400'
+              }`}
             />
             <textarea
               value={element.content.body || ''}
               onChange={(e) => onUpdate(element.id, { content: { ...element.content, body: e.target.value } })}
               placeholder="Type your notes..."
-              className="w-full flex-1 bg-transparent text-xs leading-relaxed outline-none resize-none text-zinc-700 dark:text-zinc-300 font-medium custom-scrollbar"
+              className={`w-full flex-1 bg-transparent text-xs leading-relaxed outline-none resize-none ${
+                theme === 'dark' ? 'text-zinc-300 placeholder:text-zinc-600' : 'text-zinc-600 placeholder:text-zinc-400'
+              }`}
             />
           </div>
         );
@@ -266,7 +338,9 @@ export function CanvasCard({
               value={element.content.text || ''}
               onChange={(e) => onUpdate(element.id, { content: { ...element.content, text: e.target.value } })}
               placeholder="Label text..."
-              className="w-full bg-transparent font-space-grotesk font-black text-base md:text-lg text-center outline-none resize-none text-zinc-900 dark:text-white"
+              className={`w-full bg-transparent font-semibold text-base text-center outline-none resize-none ${
+                theme === 'dark' ? 'text-white placeholder:text-zinc-600' : 'text-zinc-900 placeholder:text-zinc-400'
+              }`}
             />
           </div>
         );
@@ -282,7 +356,7 @@ export function CanvasCard({
         return (
           <div className="flex flex-col h-full pointer-events-auto">
             {element.content.src ? (
-              <div className="flex-1 relative group rounded-3xl overflow-hidden flex flex-col bg-black">
+              <div className="flex-1 relative group/img overflow-hidden flex flex-col bg-black rounded-xl">
                 {isVideo ? (
                   <video
                     src={element.content.src}
@@ -290,53 +364,64 @@ export function CanvasCard({
                     loop
                     muted
                     playsInline
-                    className="flex-1 w-full object-cover min-h-0 rounded-3xl"
+                    className="flex-1 w-full object-cover min-h-0"
                   />
                 ) : (
                   <img
                     src={element.content.src}
                     alt={element.content.caption || 'Canvas Image'}
-                    className="flex-1 w-full object-cover min-h-0 rounded-3xl"
+                    className="flex-1 w-full object-cover min-h-0"
                   />
                 )}
-                <input
-                  type="text"
-                  value={element.content.caption || ''}
-                  onChange={(e) => onUpdate(element.id, { content: { ...element.content, caption: e.target.value } })}
-                  placeholder="Image caption..."
-                  className="w-full bg-transparent text-[10px] text-zinc-500 font-bold text-center mt-1.5 outline-none"
-                />
+                {/* Caption overlay on hover */}
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity">
+                  <input
+                    type="text"
+                    value={element.content.caption || ''}
+                    onChange={(e) => onUpdate(element.id, { content: { ...element.content, caption: e.target.value } })}
+                    placeholder="Add caption..."
+                    className="w-full bg-transparent text-[10px] text-white/90 font-medium text-center outline-none placeholder:text-white/40"
+                  />
+                </div>
                 <button
                   onClick={() => onUpdate(element.id, { content: { ...element.content, src: '' } })}
-                  className="absolute top-2 right-2 p-1.5 bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove Image"
+                  className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover/img:opacity-100 transition-opacity"
+                  title="Remove"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
-              <div className="flex-1 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center p-4 text-center bg-zinc-50/30 dark:bg-black/10">
-                <ImageIcon className="w-7 h-7 text-zinc-400 mb-1.5" />
-                <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 mb-2">Insert Board Image</span>
-                <div className="flex items-center gap-1.5 w-full bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1.5 rounded-xl shadow-sm mb-2">
+              <div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 text-center ${
+                theme === 'dark' ? 'border-zinc-700 bg-zinc-800/20' : 'border-zinc-200 bg-zinc-50/50'
+              }`}>
+                <ImageIcon className="w-6 h-6 text-zinc-400 mb-1.5" />
+                <span className={`text-[9px] font-semibold uppercase tracking-wider mb-2 ${
+                  theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'
+                }`}>Insert Image</span>
+                <div className={`flex items-center gap-1.5 w-full px-2.5 py-1.5 rounded-lg mb-2 ${
+                  theme === 'dark' ? 'bg-zinc-800/80 border border-zinc-700/60' : 'bg-white border border-zinc-200/80'
+                }`}>
                   <Search className="w-3.5 h-3.5 text-zinc-400" />
                   <input
                     type="text"
-                    placeholder="Search Free Unsplash..."
+                    placeholder="Search Unsplash..."
                     value={imageSearch}
                     onChange={(e) => setImageSearch(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchFreeImages(imageSearch)}
-                    className="w-full bg-transparent text-[10px] font-bold outline-none placeholder:text-zinc-500 text-zinc-800 dark:text-zinc-200"
+                    className={`w-full bg-transparent text-[10px] font-medium outline-none ${
+                      theme === 'dark' ? 'text-zinc-200 placeholder:text-zinc-600' : 'text-zinc-800 placeholder:text-zinc-500'
+                    }`}
                   />
                 </div>
-                {isSearchingImages && <span className="text-[9px] text-rose-500 animate-pulse mb-2">Searching...</span>}
-                <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-2">OR</div>
+                {isSearchingImages && <span className="text-[9px] text-blue-500 animate-pulse mb-2">Searching...</span>}
+                <div className="text-[8px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">or</div>
                 <label 
                   htmlFor={`image-upload-${element.id}`}
-                  className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-sm inline-flex items-center gap-1"
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-[9px] font-semibold uppercase tracking-wider rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" />
-                  Upload Image
+                  Upload
                 </label>
                 <input
                   type="file"
@@ -355,7 +440,7 @@ export function CanvasCard({
         return (
           <div className="flex flex-col h-full pointer-events-auto">
             {media ? (
-              <div className="flex-1 rounded-3xl overflow-hidden relative w-full h-full bg-black border border-zinc-200/20">
+              <div className="flex-1 overflow-hidden relative w-full h-full bg-black rounded-xl">
                 {media.type === 'video' ? (
                   <video
                     src={media.embedUrl}
@@ -364,20 +449,20 @@ export function CanvasCard({
                     muted
                     playsInline
                     controls
-                    className="w-full h-full object-cover rounded-3xl"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
                   <iframe
                     src={media.embedUrl}
-                    className="w-full h-full border-0 rounded-3xl"
+                    className="w-full h-full border-0"
                     allow="autoplay; encrypted-media; fullscreen"
                     allowFullScreen
                     scrolling="no"
                   />
                 )}
-                {/* Small indicator label */}
-                <div className="absolute top-2.5 left-2.5 px-2 py-1 bg-black/80 border border-white/10 text-[8px] font-black uppercase text-rose-500 tracking-wider rounded-lg shadow-md pointer-events-none">
-                  {media.type} Player
+                {/* Small type label */}
+                <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 text-[7px] font-semibold uppercase text-white/70 tracking-wider rounded-md pointer-events-none">
+                  {media.type}
                 </div>
               </div>
             ) : element.content.title ? (
@@ -385,13 +470,15 @@ export function CanvasCard({
                 href={element.content.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex flex-col rounded-lg overflow-hidden group/link bg-zinc-50/50 dark:bg-black/30 border border-zinc-100 dark:border-zinc-800/50 p-3"
+                className={`flex-1 flex flex-col rounded-lg overflow-hidden group/link p-3 ${
+                  theme === 'dark' ? 'bg-zinc-800/30 border border-zinc-700/30' : 'bg-zinc-50/50 border border-zinc-100'
+                }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   {element.content.favicon && (
                     <img src={element.content.favicon} className="w-4 h-4 rounded" alt="favicon" />
                   )}
-                  <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider flex-1 truncate">
+                  <span className="text-[10px] font-medium text-blue-500 flex-1 truncate">
                     {element.content.url}
                   </span>
                   <ExternalLink className="w-3 h-3 text-zinc-400 opacity-0 group-hover/link:opacity-100 transition-opacity" />
@@ -399,23 +486,33 @@ export function CanvasCard({
                 {element.content.image && (
                   <img src={element.content.image} className="w-full h-24 object-cover rounded-lg mb-2" alt="preview" />
                 )}
-                <h4 className="text-xs font-black text-zinc-900 dark:text-white line-clamp-1 mb-1 leading-snug">
+                <h4 className={`text-xs font-semibold line-clamp-1 mb-1 leading-snug ${
+                  theme === 'dark' ? 'text-white' : 'text-zinc-900'
+                }`}>
                   {element.content.title}
                 </h4>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                <p className={`text-[10px] line-clamp-2 leading-relaxed ${
+                  theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'
+                }`}>
                   {element.content.description}
                 </p>
               </a>
             ) : (
-              <div className="flex-1 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center p-4 text-center">
-                <LinkIcon className="w-8 h-8 text-zinc-400 mb-2" />
-                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-3">Embed URL Web Clip</span>
+              <div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 text-center ${
+                theme === 'dark' ? 'border-zinc-700 bg-zinc-800/20' : 'border-zinc-200 bg-zinc-50/50'
+              }`}>
+                <LinkIcon className="w-7 h-7 text-zinc-400 mb-2" />
+                <span className={`text-[10px] font-semibold uppercase tracking-wider mb-3 ${
+                  theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'
+                }`}>Embed URL</span>
                 <input
                   type="url"
                   placeholder="https://example.com"
                   onBlur={(e) => handleLoadLinkPreview(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleLoadLinkPreview(e.currentTarget.value)}
-                  className="w-full px-3 py-2 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-[10px] font-bold outline-none text-zinc-800 dark:text-zinc-200"
+                  className={`w-full px-3 py-2 rounded-lg text-[10px] font-medium outline-none ${
+                    theme === 'dark' ? 'bg-zinc-800/80 border border-zinc-700/60 text-zinc-200' : 'bg-white border border-zinc-200 text-zinc-800'
+                  }`}
                 />
               </div>
             )}
@@ -426,27 +523,37 @@ export function CanvasCard({
         return (
           <div className="flex flex-col h-full pointer-events-auto justify-center">
             {element.content.fileName ? (
-              <div className="flex items-center gap-4 p-4 bg-zinc-50 dark:bg-black/30 border border-zinc-100 dark:border-zinc-800/50 rounded-2xl group/file">
-                <div className="w-12 h-12 bg-rose-500/10 text-rose-500 rounded-xl flex items-center justify-center">
-                  <FileText className="w-6 h-6" />
+              <div className={`flex items-center gap-4 p-4 rounded-xl group/file ${
+                theme === 'dark' ? 'bg-zinc-800/30 border border-zinc-700/30' : 'bg-zinc-50 border border-zinc-100'
+              }`}>
+                <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-black text-zinc-900 dark:text-white truncate">{element.content.fileName}</h4>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">{element.content.fileSize}</p>
+                  <h4 className={`text-xs font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>
+                    {element.content.fileName}
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{element.content.fileSize}</p>
                 </div>
                 <button
-                  className="w-9 h-9 flex items-center justify-center bg-white dark:bg-zinc-800 text-zinc-600 dark:text-white rounded-xl border border-zinc-200 dark:border-zinc-700 hover:scale-110 active:scale-95 transition-all"
-                  title="Download File"
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                    theme === 'dark' ? 'bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700' : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
+                  }`}
+                  title="Download"
                   onClick={() => toast.success(`Downloading "${element.content.fileName}"`)}
                 >
                   <Download className="w-4 h-4" />
                 </button>
               </div>
             ) : (
-              <div className="flex-1 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center p-4 text-center">
+              <div className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 text-center ${
+                theme === 'dark' ? 'border-zinc-700 bg-zinc-800/20' : 'border-zinc-200 bg-zinc-50/50'
+              }`}>
                 <label className="cursor-pointer flex flex-col items-center justify-center">
-                  <FileText className="w-8 h-8 text-zinc-400 mb-2" />
-                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Choose / Drop File</span>
+                  <FileText className="w-7 h-7 text-zinc-400 mb-2" />
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'
+                  }`}>Drop or Choose File</span>
                   <input
                     type="file"
                     className="hidden"
@@ -471,19 +578,23 @@ export function CanvasCard({
               value={element.content.title || ''}
               onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
               placeholder="Task list title"
-              className="w-full bg-transparent font-space-grotesk font-black text-sm outline-none border-b border-zinc-200/50 dark:border-zinc-800/50 pb-1.5 mb-2 text-zinc-900 dark:text-zinc-100"
+              className={`w-full bg-transparent font-semibold text-sm outline-none pb-1.5 mb-2 ${
+                theme === 'dark' 
+                  ? 'text-zinc-100 border-b border-zinc-700/40 placeholder:text-zinc-600'
+                  : 'text-zinc-800 border-b border-zinc-200/60 placeholder:text-zinc-400'
+              }`}
             />
             {/* Progress bar */}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Progress</span>
-              <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">{progressPercent}%</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[9px] font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Progress</span>
+              <span className="text-[9px] font-semibold text-blue-500">{progressPercent}%</span>
             </div>
-            <div className="w-full h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full mb-4 overflow-hidden">
-              <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+            <div className={`w-full h-1 rounded-full mb-3 overflow-hidden ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
             </div>
 
             {/* Tasks list */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
               {tasks.map((task) => (
                 <div key={task.id} className="flex items-center gap-2">
                   <input
@@ -493,7 +604,7 @@ export function CanvasCard({
                       const updatedTasks = tasks.map((t) => t.id === task.id ? { ...t, completed: e.target.checked } : t);
                       onUpdate(element.id, { content: { ...element.content, tasks: updatedTasks } });
                     }}
-                    className="w-4 h-4 accent-rose-500 rounded border-zinc-300 text-rose-500"
+                    className="w-3.5 h-3.5 accent-blue-500 rounded border-zinc-300"
                   />
                   <input
                     type="text"
@@ -502,16 +613,20 @@ export function CanvasCard({
                       const updatedTasks = tasks.map((t) => t.id === task.id ? { ...t, text: e.target.value } : t);
                       onUpdate(element.id, { content: { ...element.content, tasks: updatedTasks } });
                     }}
-                    className={`flex-1 bg-transparent text-[11px] outline-none text-zinc-700 dark:text-zinc-300 font-semibold ${task.completed ? 'line-through opacity-40' : ''}`}
+                    className={`flex-1 bg-transparent text-[11px] outline-none font-medium ${
+                      task.completed 
+                        ? 'line-through opacity-40' 
+                        : theme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'
+                    }`}
                   />
                   <button
                     onClick={() => {
                       const updatedTasks = tasks.filter((t) => t.id !== task.id);
                       onUpdate(element.id, { content: { ...element.content, tasks: updatedTasks } });
                     }}
-                    className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                    className="p-0.5 text-zinc-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               ))}
@@ -523,9 +638,13 @@ export function CanvasCard({
                 const newTask = { id: Math.random().toString(), text: 'New Task', completed: false };
                 onUpdate(element.id, { content: { ...element.content, tasks: [...tasks, newTask] } });
               }}
-              className="mt-3 w-full py-1.5 border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-rose-500 hover:border-rose-500 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5"
+              className={`mt-2 w-full py-1.5 border border-dashed text-[10px] font-semibold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                theme === 'dark' 
+                  ? 'border-zinc-700 text-zinc-500 hover:text-blue-400 hover:border-blue-500/40'
+                  : 'border-zinc-300 text-zinc-500 hover:text-blue-500 hover:border-blue-400'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3 h-3" />
               Add Task
             </button>
           </div>
@@ -539,12 +658,19 @@ export function CanvasCard({
               value={element.content.title || ''}
               onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
               placeholder="Column title"
-              className="w-full bg-transparent font-space-grotesk font-black text-sm text-center uppercase tracking-wider outline-none border-b border-zinc-200/50 dark:border-zinc-800/50 pb-2 mb-4 text-zinc-900 dark:text-zinc-100"
+              className={`w-full bg-transparent font-semibold text-sm text-center uppercase tracking-wider outline-none pb-2 mb-4 ${
+                theme === 'dark' 
+                  ? 'text-zinc-100 border-b border-zinc-700/40 placeholder:text-zinc-600'
+                  : 'text-zinc-800 border-b border-zinc-200/60 placeholder:text-zinc-400'
+              }`}
             />
-            {/* Lane container body */}
-            <div className="flex-1 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center p-4 text-center bg-black/10 dark:bg-black/40">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-relaxed">
-                Drag cards over this lane to cluster layout
+            <div className={`flex-1 border-2 border-dashed rounded-xl flex items-center justify-center p-4 text-center ${
+              theme === 'dark' ? 'border-zinc-700/50 bg-black/20' : 'border-zinc-300/50 bg-white/20'
+            }`}>
+              <span className={`text-[10px] font-medium uppercase tracking-wider leading-relaxed ${
+                theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'
+              }`}>
+                Drag cards over this lane
               </span>
             </div>
           </div>
@@ -553,19 +679,25 @@ export function CanvasCard({
       case 'board_link':
         return (
           <div className="flex flex-col h-full pointer-events-auto justify-center text-center">
-            <div className="w-12 h-12 bg-teal-500/10 text-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <FolderOpen className="w-6 h-6" />
+            <div className="w-10 h-10 bg-teal-500/10 text-teal-500 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <FolderOpen className="w-5 h-5" />
             </div>
             <input
               type="text"
               value={element.content.title || ''}
               onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
               placeholder="Nested board name..."
-              className="w-full bg-transparent font-space-grotesk font-black text-xs text-center outline-none mb-3 text-zinc-900 dark:text-white"
+              className={`w-full bg-transparent font-semibold text-xs text-center outline-none mb-3 ${
+                theme === 'dark' ? 'text-white placeholder:text-zinc-600' : 'text-zinc-900 placeholder:text-zinc-400'
+              }`}
             />
             <button
-              onClick={() => toast.info('Opening nested Board workspace...')}
-              className="mx-auto px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 rounded-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5"
+              onClick={() => toast.info('Opening nested board...')}
+              className={`mx-auto px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 ${
+                theme === 'dark' 
+                  ? 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                  : 'bg-zinc-100 border border-zinc-200 text-zinc-600 hover:bg-zinc-200'
+              }`}
             >
               Enter Board
               <ChevronRight className="w-3 h-3" />
@@ -578,118 +710,142 @@ export function CanvasCard({
     }
   };
 
+  // ─── Compute card styles ───
+  const getCardBackground = () => {
+    if (isBorderless) return 'transparent';
+    if (element.type === 'column') {
+      return theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(240, 240, 242, 0.6)';
+    }
+    return theme === 'dark'
+      ? (PASTEL_COLORS.find(c => c.value === element.color)?.darkValue || '#262626')
+      : (element.color || '#FFFFFF');
+  };
+
+  const getCardBorder = () => {
+    if (isSelected) return undefined; // ring handles the outline
+    if (isBorderless) return 'transparent';
+    if (element.type === 'column') {
+      return theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)';
+    }
+    return theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)';
+  };
+
+  // Build className for card wrapper
+  const wrapperClasses = [
+    'absolute select-none pointer-events-auto rounded-xl transition-shadow duration-200 group',
+    // Selection states
+    isSelected
+      ? 'ring-2 ring-blue-500 shadow-lg z-10'
+      : isConnectingSource
+        ? 'ring-2 ring-indigo-500 shadow-lg z-10'
+        : activeTool === 'connect'
+          ? 'hover:ring-2 hover:ring-indigo-400 cursor-pointer'
+          : activeTool === 'delete'
+            ? 'hover:ring-2 hover:ring-red-400 cursor-crosshair'
+            : isBorderless
+              ? 'hover:shadow-none'
+              : `shadow-sm hover:shadow-lg`,
+    // Cursor
+    activeTool === 'select' && !isBorderless ? 'cursor-grab active:cursor-grabbing' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <motion.div
-      ref={dragRef}
-      drag={activeTool === 'select'}
-      dragMomentum={false}
-      dragElastic={0}
-      onDrag={(event, info) => {
-        onDrag(element.id, element.x + info.delta.x, element.y + info.delta.y);
+    <div
+      ref={cardRef}
+      onMouseDown={handleCardMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => { setIsHovered(false); setShowColorPicker(false); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!hasDraggedRef.current) {
+          onClick(element.id);
+        }
       }}
-      onDragEnd={(event, info) => {
-        onDragEnd(element.id, element.x, element.y);
-      }}
-      className={`absolute select-none pointer-events-auto rounded-3xl border transition-all duration-300 group ${
-        isSelected 
-          ? 'ring-4 ring-rose-500 border-rose-500 scale-[1.01] shadow-xl z-10'
-          : isConnectingSource 
-            ? 'ring-4 ring-indigo-500 border-indigo-500 scale-[1.03] shadow-2xl z-10' 
-            : activeTool === 'connect' 
-              ? 'hover:ring-4 hover:ring-indigo-400 hover:border-indigo-400 hover:scale-[1.02] cursor-pointer'
-              : activeTool === 'delete'
-                ? 'hover:ring-4 hover:ring-red-400 hover:border-red-400 cursor-crosshair'
-                : isBorderless
-                  ? '' 
-                  : 'hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] shadow-sm'
-      }`}
+      className={wrapperClasses}
       style={{
         left: element.x,
         top: element.y,
         width: element.width || 280,
         height: element.height || 180,
-        backgroundColor: isBorderless
-          ? 'transparent' 
-          : element.type === 'column'
-            ? (theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(235, 235, 238, 0.6)')
-            : (theme === 'dark' 
-                ? (PASTEL_COLORS.find(c => c.value === element.color)?.darkValue || '#262626') 
-                : (element.color || '#FFFFFF')),
-        borderColor: isSelected
-          ? undefined
-          : isBorderless
-            ? 'transparent' 
-            : element.type === 'column'
-              ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)')
-              : (theme === 'dark'
-                  ? 'rgba(255,255,255,0.08)'
-                  : (element.color === '#FFFFFF' ? 'rgba(0,0,0,0.06)' : 'transparent')),
+        backgroundColor: getCardBackground(),
+        borderWidth: isBorderless ? 0 : 1,
+        borderStyle: 'solid',
+        borderColor: getCardBorder(),
         backdropFilter: element.type === 'column' ? 'blur(12px)' : undefined,
         WebkitBackdropFilter: element.type === 'column' ? 'blur(12px)' : undefined,
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(element.id);
+        overflow: isBorderless ? 'visible' : 'hidden',
       }}
     >
-      {/* Element wrapper */}
-      <div className={`relative w-full h-full flex flex-col ${isBorderless ? 'p-0' : 'p-5'}`}>
-        {/* Color picker option trigger */}
+      {/* Content */}
+      <div className={`relative w-full h-full flex flex-col ${isBorderless ? 'p-0' : 'p-4'}`}>
+        {/* Hover action buttons - color picker & delete */}
         {element.type !== 'text' && element.type !== 'column' && activeTool === 'select' && (
-          <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity">
+          <div className={`absolute top-2 right-2 flex items-center gap-1 z-20 transition-opacity duration-150 ${
+            isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
             <button
-              onClick={() => setShowColorPicker(!showColorPicker)}
-              className="p-1.5 bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-700 text-zinc-500 hover:text-rose-500 border border-zinc-200 dark:border-zinc-700 rounded-lg transition-all"
-              title="Change Background Color"
+              onClick={(e) => { e.stopPropagation(); setShowColorPicker(!showColorPicker); }}
+              className={`p-1 rounded-md transition-colors ${
+                theme === 'dark' ? 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-400 hover:text-white' : 'bg-white/90 hover:bg-white text-zinc-500 hover:text-zinc-700 shadow-sm'
+              }`}
+              title="Color"
             >
-              <Palette className="w-3.5 h-3.5" />
+              <Palette className="w-3 h-3" />
             </button>
             <button
-              onClick={() => onDelete(element.id)}
-              className="p-1.5 bg-white/80 dark:bg-zinc-800/80 hover:bg-red-500 hover:text-white text-zinc-500 border border-zinc-200 dark:border-zinc-700 rounded-lg transition-all"
-              title="Delete Card"
+              onClick={(e) => { e.stopPropagation(); onDelete(element.id); }}
+              className={`p-1 rounded-md transition-colors ${
+                theme === 'dark' ? 'bg-zinc-800/90 hover:bg-red-500 text-zinc-400 hover:text-white' : 'bg-white/90 hover:bg-red-500 text-zinc-500 hover:text-white shadow-sm'
+              }`}
+              title="Delete"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         )}
 
         {/* Color Picker Popover */}
         {showColorPicker && (
-          <div className="absolute top-12 right-3 z-30 flex items-center gap-1 p-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl">
+          <div className={`absolute top-9 right-2 z-30 flex items-center gap-1 p-1.5 rounded-lg shadow-xl ${
+            theme === 'dark' ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-zinc-200'
+          }`}>
             {PASTEL_COLORS.map(color => (
               <button
                 key={color.value}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onUpdate(element.id, { color: color.value });
                   setShowColorPicker(false);
                 }}
-                className="w-5 h-5 rounded-full border border-black/10 shrink-0 transition-transform hover:scale-125"
-                style={{ backgroundColor: color.value }}
+                className="w-4.5 h-4.5 rounded-full border border-black/10 shrink-0 transition-transform hover:scale-125"
+                style={{ backgroundColor: color.value, width: 18, height: 18 }}
                 title={color.name}
               />
             ))}
           </div>
         )}
 
-        {/* Dynamic Card Renders */}
+        {/* Card content */}
         <div className="flex-1 min-h-0">
           {renderCardContent()}
         </div>
 
-        {/* Resize Handle (Bottom-Right) */}
+        {/* Resize Handle - subtle, hover only */}
         {element.type !== 'text' && activeTool === 'select' && (
           <div
+            data-resize-handle="true"
             onMouseDown={handleResizeStart}
-            className="absolute bottom-1 right-1 w-4 h-4 cursor-se-resize flex items-end justify-end pointer-events-auto"
-            title="Drag to resize card"
+            className={`absolute bottom-0.5 right-0.5 w-4 h-4 cursor-se-resize flex items-end justify-end pointer-events-auto transition-opacity duration-150 ${
+              isHovered ? 'opacity-60' : 'opacity-0'
+            }`}
+            title="Resize"
           >
-            <svg width="8" height="8" viewBox="0 0 8 8" className="text-zinc-300 dark:text-zinc-600">
+            <svg width="7" height="7" viewBox="0 0 8 8" className={theme === 'dark' ? 'text-zinc-500' : 'text-zinc-300'}>
               <path d="M6 0 L8 0 L8 8 L0 8 L0 6 L4 6 L4 4 L6 4 Z" fill="currentColor" />
             </svg>
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

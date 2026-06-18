@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { 
-  ZoomIn, ZoomOut, Maximize, Minimize, Undo, Redo, Grid, Presentation, 
+  ZoomIn, ZoomOut, Maximize, Minimize, Undo, Redo, Grid, 
   Share2, Download, StickyNote, Image as ImageIcon, Link as LinkIcon, 
   FileText, CheckSquare, Columns, FolderOpen, ArrowRight, Type, 
-  X, Plus, Trash2, Settings2, Play, Users, Eye, HelpCircle, Check, ArrowLeft,
-  Sun, Moon
+  X, Plus, Trash2, ArrowLeft, Sun, Moon
 } from 'lucide-react';
 import { CanvasBoard, CanvasElement, CanvasConnector } from '@/types';
 import { toast } from 'sonner';
@@ -29,7 +28,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
   const [zoom, setZoom] = useState(1);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [activeTool, setActiveTool] = useState<'select' | 'connect' | 'delete'>('select');
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [pendingPlacement, setPendingPlacement] = useState<CanvasElement['type'] | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -41,19 +40,21 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
   const [history, setHistory] = useState<CanvasElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Dragging states
+  // Panning states
   const [isPanning, setIsPanning] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
   
-  // Mouse tracking for pasting image at cursor
+  // Mouse tracking for paste-at-cursor
   const mouseCoordsRef = useRef({ x: 0, y: 0 });
   const isMouseOverCanvasRef = useRef(false);
 
-  // Presence simulation
-  const [presenceCursors, setPresenceCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
+  // Marquee selection state
+  const [selectionRect, setSelectionRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+  const isMarqueeRef = useRef(false);
+  const marqueeStartRef = useRef({ x: 0, y: 0 });
 
-  // Open Template Gallery Modal state
+  // Modals
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
@@ -62,7 +63,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     fetchBoardData();
   }, [board.id]);
 
-  // Sync state with browser-level fullscreen changes
+  // Sync browser fullscreen state
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -83,10 +84,9 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     }
   };
 
-  // Global paste handler to detect copy-pasted images
+  // ─── Paste handler (images) ───
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
-      // Don't intercept paste if focused on an input or textarea
       const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' || 
@@ -115,11 +115,9 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
                 
                 let targetX, targetY;
                 if (isMouseOverCanvasRef.current) {
-                  // Center under mouse cursor
                   targetX = mouseCoordsRef.current.x - defaultWidth / 2;
                   targetY = mouseCoordsRef.current.y - defaultHeight / 2;
                 } else {
-                  // Center in the middle of active viewport
                   const viewportCenterX = (window.innerWidth / 2 - pan.x) / zoom;
                   const viewportCenterY = (window.innerHeight / 2 - pan.y) / zoom;
                   targetX = viewportCenterX - defaultWidth / 2;
@@ -134,7 +132,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
               }
             };
             reader.readAsDataURL(file);
-            break; // Handle single image paste
+            break;
           }
         }
       }
@@ -146,7 +144,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     };
   }, [pan, zoom, elements, board.id, snapToGrid]);
 
-  // Global keydown handler to delete selected element with Delete / Backspace keys
+  // ─── Keyboard shortcuts ───
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -160,10 +158,26 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
         return;
       }
 
-      if (selectedElementId && (e.key === 'Delete' || e.key === 'Backspace')) {
+      // Delete/Backspace — delete all selected elements
+      if (selectedElementIds.size > 0 && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault();
-        handleDeleteElement(selectedElementId);
-        setSelectedElementId(null);
+        selectedElementIds.forEach(id => handleDeleteElement(id));
+        setSelectedElementIds(new Set());
+      }
+
+      // Escape — clear selection or cancel placement
+      if (e.key === 'Escape') {
+        if (pendingPlacement) {
+          setPendingPlacement(null);
+        } else {
+          setSelectedElementIds(new Set());
+        }
+      }
+
+      // Ctrl+A — select all
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        setSelectedElementIds(new Set(elements.map(el => el.id)));
       }
     };
 
@@ -171,7 +185,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedElementId, elements]);
+  }, [selectedElementIds, elements, pendingPlacement]);
 
   const fetchBoardData = async () => {
     try {
@@ -193,16 +207,15 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
       setElements(loadedElements);
       setConnectors(connectorsData || []);
 
-      // Initialize history
       setHistory([loadedElements]);
       setHistoryIndex(0);
     } catch (error) {
       console.error('Error fetching canvas data:', error);
-      toast.error('Failed to load board components');
+      toast.error('Failed to load board');
     }
   };
 
-  // Push state to Undo History
+  // ─── History management ───
   const pushToHistory = (newElements: CanvasElement[]) => {
     const updatedHistory = history.slice(0, historyIndex + 1);
     setHistory([...updatedHistory, newElements]);
@@ -215,9 +228,8 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
       const targetState = history[newIndex];
       setHistoryIndex(newIndex);
       setElements(targetState);
-      // Persist undo sync
       syncElementsState(targetState);
-      toast.success('Action undone');
+      toast.success('Undone');
     }
   };
 
@@ -227,14 +239,12 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
       const targetState = history[newIndex];
       setHistoryIndex(newIndex);
       setElements(targetState);
-      // Persist redo sync
       syncElementsState(targetState);
-      toast.success('Action redone');
+      toast.success('Redone');
     }
   };
 
   const syncElementsState = async (state: CanvasElement[]) => {
-    // Sync all positions to Database
     for (const el of state) {
       await supabase
         .from('canvas_elements')
@@ -243,8 +253,9 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     }
   };
 
-  // Mouse Handlers for infinite canvas panning
+  // ─── Mouse Handlers ───
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Click-to-place mode
     if (pendingPlacement) {
       if (
         e.target === canvasRef.current || 
@@ -268,14 +279,32 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     }
 
     if (activeTool !== 'select') return;
-    if (
+
+    // Check if clicking on empty canvas (for panning or marquee)
+    const isCanvasClick = (
       e.target === canvasRef.current || 
       (e.target as HTMLElement).classList.contains('canvas-grid') ||
       (e.target as HTMLElement).tagName === 'svg'
-    ) {
+    );
+
+    if (isCanvasClick) {
+      // Shift-click starts marquee selection
+      if (e.shiftKey) {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+          const canvasX = (e.clientX - rect.left - pan.x) / zoom;
+          const canvasY = (e.clientY - rect.top - pan.y) / zoom;
+          isMarqueeRef.current = true;
+          marqueeStartRef.current = { x: canvasX, y: canvasY };
+          setSelectionRect({ startX: canvasX, startY: canvasY, endX: canvasX, endY: canvasY });
+        }
+        return;
+      }
+
+      // Regular click on canvas — start panning, clear selection
       setIsPanning(true);
       dragStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-      setSelectedElementId(null);
+      setSelectedElementIds(new Set());
     }
   };
 
@@ -288,6 +317,15 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
       };
     }
 
+    // Marquee selection
+    if (isMarqueeRef.current && rect) {
+      const canvasX = (e.clientX - rect.left - pan.x) / zoom;
+      const canvasY = (e.clientY - rect.top - pan.y) / zoom;
+      setSelectionRect(prev => prev ? { ...prev, endX: canvasX, endY: canvasY } : null);
+      return;
+    }
+
+    // Panning
     if (isPanning) {
       setPan({
         x: e.clientX - dragStartRef.current.x,
@@ -298,22 +336,42 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
   const handleMouseUp = () => {
     setIsPanning(false);
+
+    // Finish marquee selection
+    if (isMarqueeRef.current && selectionRect) {
+      isMarqueeRef.current = false;
+      
+      const minX = Math.min(selectionRect.startX, selectionRect.endX);
+      const maxX = Math.max(selectionRect.startX, selectionRect.endX);
+      const minY = Math.min(selectionRect.startY, selectionRect.endY);
+      const maxY = Math.max(selectionRect.startY, selectionRect.endY);
+
+      const selected = new Set<string>();
+      elements.forEach(el => {
+        const elRight = el.x + (el.width || 280);
+        const elBottom = el.y + (el.height || 180);
+        // Element overlaps with selection rect
+        if (el.x < maxX && elRight > minX && el.y < maxY && elBottom > minY) {
+          selected.add(el.id);
+        }
+      });
+      setSelectedElementIds(selected);
+      setSelectionRect(null);
+    }
   };
 
-  // Zooming Logic
+  // ─── Zooming ───
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     
-    // Mouse coordinates relative to the canvas container (viewport)
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
     const scale = e.deltaY < 0 ? 1.08 : 0.92;
     const nextZoom = Math.min(Math.max(zoom * scale, 0.2), 3.0);
     
-    // Calculate new pan so zoom centers on mouse
     const newPanX = mouseX - (mouseX - pan.x) * (nextZoom / zoom);
     const newPanY = mouseY - (mouseY - pan.y) * (nextZoom / zoom);
 
@@ -336,18 +394,17 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
   };
 
-  // Grid Snapping
+  // Grid snapping
   const snapValue = (val: number) => {
     if (!snapToGrid) return val;
     return Math.round(val / 20) * 20;
   };
 
-  // Element Actions
+  // ─── Element Actions ───
   const handleAddElement = async (type: CanvasElement['type'], customPosition?: { x: number; y: number }, customSrc?: string) => {
     const defaultWidth = type === 'column' ? 320 : type === 'image' ? 320 : type === 'text' ? 240 : 280;
     const defaultHeight = type === 'column' ? 500 : type === 'image' ? 240 : type === 'text' ? 60 : 180;
     
-    // Spawn in the center of current viewport view, taking zoom into account
     const viewportCenterX = (window.innerWidth / 2 - pan.x) / zoom;
     const viewportCenterY = (window.innerHeight / 2 - pan.y) / zoom;
     
@@ -358,17 +415,17 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     if (type === 'note') {
       defaultContent = { title: 'Untitled Note', body: 'Start typing here...' };
     } else if (type === 'text') {
-      defaultContent = { text: 'Double click to edit label' };
+      defaultContent = { text: 'Double click to edit' };
     } else if (type === 'todo') {
       defaultContent = { title: 'To-do List', tasks: [{ id: '1', text: 'First task', completed: false }] };
     } else if (type === 'link') {
-      defaultContent = { url: '', title: 'Web Link preview', description: 'Enter link to load preview metadata.' };
+      defaultContent = { url: '', title: '', description: '' };
     } else if (type === 'image') {
-      defaultContent = { src: customSrc || '', caption: customSrc ? 'Pasted image' : 'Caption descriptive text' };
+      defaultContent = { src: customSrc || '', caption: customSrc ? 'Pasted image' : '' };
     } else if (type === 'column') {
-      defaultContent = { title: 'New Lane', childIds: [] };
+      defaultContent = { title: 'Column', childIds: [] };
     } else if (type === 'board_link') {
-      defaultContent = { title: 'Nested Workspace Sub-board', boardId: null };
+      defaultContent = { title: 'Sub-board', boardId: null };
     }
 
     const newElementPayload = {
@@ -378,7 +435,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
       y: posY,
       width: defaultWidth,
       height: defaultHeight,
-      color: type === 'note' ? '#FEF9C3' : '#FFFFFF', // Yellow pastel default note
+      color: type === 'note' ? '#FEF9C3' : '#FFFFFF',
       content: defaultContent
     };
 
@@ -393,11 +450,11 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
         const updated = [...elements, data[0]];
         setElements(updated);
         pushToHistory(updated);
-        toast.success(customSrc ? 'Image pasted successfully' : `${type.toUpperCase()} Card dropped`);
+        toast.success(customSrc ? 'Image pasted' : `${type} added`);
       }
     } catch (err) {
       console.error(err);
-      toast.error('Could not create element');
+      toast.error('Failed to create element');
     }
   };
 
@@ -422,12 +479,26 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     }
   };
 
+  // ─── Drag handlers (called by CanvasCard) ───
   const handleDragElement = (id: string, newX: number, newY: number) => {
-    // Snap to grid option
     const finalX = snapValue(newX);
     const finalY = snapValue(newY);
 
-    setElements(prev => prev.map(el => el.id === id ? { ...el, x: finalX, y: finalY } : el));
+    // If dragging a selected element, move all selected together
+    if (selectedElementIds.has(id) && selectedElementIds.size > 1) {
+      const draggedEl = elements.find(el => el.id === id);
+      if (draggedEl) {
+        const deltaX = finalX - draggedEl.x;
+        const deltaY = finalY - draggedEl.y;
+        setElements(prev => prev.map(el => 
+          selectedElementIds.has(el.id) 
+            ? { ...el, x: el.x + deltaX, y: el.y + deltaY }
+            : el
+        ));
+      }
+    } else {
+      setElements(prev => prev.map(el => el.id === id ? { ...el, x: finalX, y: finalY } : el));
+    }
   };
 
   const handleDragElementEnd = async (id: string, newX: number, newY: number) => {
@@ -438,13 +509,24 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     setElements(updated);
     pushToHistory(updated);
 
-    try {
-      await supabase
-        .from('canvas_elements')
-        .update({ x: finalX, y: finalY })
-        .eq('id', id);
-    } catch (err) {
-      console.error('Drag update persistence failed:', err);
+    // Persist all selected elements positions
+    if (selectedElementIds.has(id) && selectedElementIds.size > 1) {
+      for (const elId of selectedElementIds) {
+        const el = updated.find(e => e.id === elId);
+        if (el) {
+          try {
+            await supabase.from('canvas_elements').update({ x: el.x, y: el.y }).eq('id', elId);
+          } catch (err) {
+            console.error('Drag persist failed:', err);
+          }
+        }
+      }
+    } else {
+      try {
+        await supabase.from('canvas_elements').update({ x: finalX, y: finalY }).eq('id', id);
+      } catch (err) {
+        console.error('Drag persist failed:', err);
+      }
     }
   };
 
@@ -454,10 +536,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
     pushToHistory(updated);
 
     try {
-      await supabase
-        .from('canvas_elements')
-        .update({ width, height })
-        .eq('id', id);
+      await supabase.from('canvas_elements').update({ width, height }).eq('id', id);
     } catch (err) {
       console.error('Resize failed:', err);
     }
@@ -465,37 +544,30 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
   const handleDeleteElement = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('canvas_elements')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('canvas_elements').delete().eq('id', id);
       if (error) throw error;
       const updated = elements.filter(el => el.id !== id);
       setElements(updated);
       setConnectors(prev => prev.filter(c => c.source_element_id !== id && c.target_element_id !== id));
       pushToHistory(updated);
-      toast.success('Element deleted');
     } catch (err) {
       console.error(err);
-      toast.error('Failed to delete element');
+      toast.error('Failed to delete');
     }
   };
 
-  // Connector Actions
-  const handleElementClick = async (id: string) => {
+  // ─── Connector Actions ───
+  const handleElementClick = (id: string) => {
     if (activeTool === 'connect') {
       if (!connectSource) {
         setConnectSource(id);
-        toast.info('Select the destination card');
+        toast.info('Select destination');
       } else {
         if (connectSource === id) {
           setConnectSource(null);
-          toast.warning('Connection cancelled');
           return;
         }
 
-        // Create connection
         const newConnectorPayload = {
           board_id: board.id,
           source_element_id: connectSource,
@@ -504,58 +576,146 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
           style: 'straight' as const
         };
 
-        try {
-          const { data, error } = await supabase
-            .from('canvas_connectors')
-            .insert([newConnectorPayload])
-            .select();
+        (async () => {
+          try {
+            const { data, error } = await supabase
+              .from('canvas_connectors')
+              .insert([newConnectorPayload])
+              .select();
 
-          if (error) throw error;
-          if (data) {
-            setConnectors([...connectors, data[0]]);
-            toast.success('Cards connected successfully');
+            if (error) throw error;
+            if (data) {
+              setConnectors([...connectors, data[0]]);
+              toast.success('Connected');
+            }
+          } catch (err) {
+            console.error(err);
+            toast.error('Connection failed');
+          } finally {
+            setConnectSource(null);
+            setActiveTool('select');
           }
-        } catch (err) {
-          console.error(err);
-          toast.error('Failed to create connector link');
-        } finally {
-          setConnectSource(null);
-          setActiveTool('select');
-        }
+        })();
       }
     } else if (activeTool === 'delete') {
       handleDeleteElement(id);
     } else if (activeTool === 'select') {
-      setSelectedElementId(id);
+      setSelectedElementIds(new Set([id]));
     }
   };
 
-  // Export board as mockup
   const handleExport = (format: 'png' | 'pdf') => {
-    toast.info(`Preparing ${format.toUpperCase()} export...`);
+    toast.info(`Preparing ${format.toUpperCase()}...`);
     setTimeout(() => {
-      toast.success(`Export successful! Mockup ${board.name}.${format} ready for download.`);
+      toast.success(`${board.name}.${format} exported`);
       setShowExportModal(false);
     }, 1500);
   };
 
+  // ─── Minimap computation ───
+  const computeMinimapData = () => {
+    if (elements.length === 0) return { elements: [], viewportRect: { left: 0, top: 0, width: 50, height: 40 } };
+
+    // Compute bounding box of all elements
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    elements.forEach(el => {
+      minX = Math.min(minX, el.x);
+      minY = Math.min(minY, el.y);
+      maxX = Math.max(maxX, el.x + (el.width || 280));
+      maxY = Math.max(maxY, el.y + (el.height || 180));
+    });
+
+    // Add padding
+    const padding = 200;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    const worldW = maxX - minX;
+    const worldH = maxY - minY;
+    const minimapW = 136; // internal minimap width in px
+    const minimapH = 80;
+    const scale = Math.min(minimapW / worldW, minimapH / worldH);
+
+    const mappedElements = elements.map(el => ({
+      id: el.id,
+      x: (el.x - minX) * scale,
+      y: (el.y - minY) * scale,
+      w: (el.width || 280) * scale,
+      h: (el.height || 180) * scale,
+      color: el.type === 'note' ? '#FBBF24' : el.type === 'image' ? '#10B981' : el.type === 'link' ? '#6366F1' : el.type === 'todo' ? '#F97316' : '#94A3B8'
+    }));
+
+    // Viewport rectangle
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const vpW = rect ? rect.width : window.innerWidth;
+    const vpH = rect ? rect.height : window.innerHeight;
+    const vpLeft = (-pan.x / zoom - minX) * scale;
+    const vpTop = (-pan.y / zoom - minY) * scale;
+    const vpWidth = (vpW / zoom) * scale;
+    const vpHeight = (vpH / zoom) * scale;
+
+    return {
+      elements: mappedElements,
+      viewportRect: {
+        left: Math.max(0, vpLeft),
+        top: Math.max(0, vpTop),
+        width: Math.min(minimapW, vpWidth),
+        height: Math.min(minimapH, vpHeight)
+      }
+    };
+  };
+
+  const minimapData = computeMinimapData();
+
+  // ─── Marquee selection rect rendering ───
+  const renderMarquee = () => {
+    if (!selectionRect) return null;
+    const left = Math.min(selectionRect.startX, selectionRect.endX);
+    const top = Math.min(selectionRect.startY, selectionRect.endY);
+    const width = Math.abs(selectionRect.endX - selectionRect.startX);
+    const height = Math.abs(selectionRect.endY - selectionRect.startY);
+
+    return (
+      <div
+        className="absolute border-2 border-blue-500 bg-blue-500/10 rounded-sm pointer-events-none"
+        style={{ left, top, width, height }}
+      />
+    );
+  };
+
+  // ─── Sidebar tool items ───
+  const sidebarTools = [
+    { type: 'note' as const, icon: StickyNote, label: 'Note', color: 'text-yellow-500' },
+    { type: 'link' as const, icon: LinkIcon, label: 'Link', color: 'text-indigo-500' },
+    { type: 'todo' as const, icon: CheckSquare, label: 'To-Do', color: 'text-amber-500' },
+    { type: 'image' as const, icon: ImageIcon, label: 'Image', color: 'text-emerald-500' },
+    { type: 'text' as const, icon: Type, label: 'Text', color: 'text-blue-500' },
+    { type: 'column' as const, icon: Columns, label: 'Column', color: 'text-purple-500' },
+    { type: 'board_link' as const, icon: FolderOpen, label: 'Board', color: 'text-teal-500' },
+  ];
+
   return (
     <div className={`overflow-hidden transition-colors duration-300 ${
       isFullscreen 
-        ? 'fixed inset-0 z-[9999] w-screen h-screen bg-[#F4F4F0] dark:bg-[#1A1A1A]' 
-        : 'relative w-full h-[calc(100vh-120px)] rounded-[2.5rem] border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner'
+        ? 'fixed inset-0 z-[9999] w-screen h-screen' 
+        : 'relative w-full h-[calc(100vh-120px)] rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner'
     } ${
-      theme === 'dark' ? 'bg-[#1A1A1A] text-white' : 'bg-[#F4F4F0] text-zinc-900'
+      theme === 'dark' ? 'bg-[#1A1A1A] text-white' : 'bg-[#FAFAFA] text-zinc-900'
     }`}>
-      {/* Floating placement indicator banner */}
+
+      {/* Placement indicator */}
       {pendingPlacement && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-3 px-5 py-2.5 bg-rose-500 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-2xl border border-rose-400/20 backdrop-blur-md animate-bounce">
-          <span>Tap canvas to place {pendingPlacement}</span>
+        <div className={`absolute top-5 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-2.5 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider rounded-full shadow-lg backdrop-blur-md ${
+          theme === 'dark' ? 'bg-blue-600/90 text-white border border-blue-500/30' : 'bg-blue-500 text-white border border-blue-400/30'
+        }`}>
+          <span>Click canvas to place {pendingPlacement}</span>
           <button 
             onClick={(e) => { e.stopPropagation(); setPendingPlacement(null); }}
-            className="p-1 bg-white/20 hover:bg-white/40 rounded-full transition-colors"
+            className="p-0.5 bg-white/20 hover:bg-white/40 rounded-full transition-colors"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3" />
           </button>
         </div>
       )}
@@ -576,19 +736,19 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
         }`}
         style={{
           backgroundImage: theme === 'dark'
-            ? 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)'
-            : 'radial-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
+            ? 'radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px)'
+            : 'radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
           backgroundPosition: `${pan.x}px ${pan.y}px`
         }}
       >
-        {/* Dynamic Zoomed and Panned Container */}
+        {/* Zoomed/Panned Container */}
         <div
           className="absolute origin-top-left pointer-events-none"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            width: '4000px',
-            height: '4000px'
+            width: '6000px',
+            height: '6000px'
           }}
         >
           {/* Connector Arrows SVG Layer */}
@@ -619,337 +779,323 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
           {/* Cards Layer */}
           <div className="absolute inset-0 pointer-events-auto">
-             {elements.map(el => (
-               <CanvasCard
-                 key={el.id}
-                 element={el}
-                 theme={theme}
-                 isSelected={selectedElementId === el.id}
-                 onDrag={handleDragElement}
-                 onDragEnd={handleDragElementEnd}
-                 onResize={handleResizeElement}
-                 onUpdate={handleUpdateElement}
-                 onDelete={handleDeleteElement}
-                 onClick={handleElementClick}
-                 isConnectingSource={connectSource === el.id}
-                 activeTool={activeTool}
-               />
-             ))}
+            {elements.map(el => (
+              <CanvasCard
+                key={el.id}
+                element={el}
+                theme={theme}
+                zoom={zoom}
+                isSelected={selectedElementIds.has(el.id)}
+                onDrag={handleDragElement}
+                onDragEnd={handleDragElementEnd}
+                onResize={handleResizeElement}
+                onUpdate={handleUpdateElement}
+                onDelete={handleDeleteElement}
+                onClick={handleElementClick}
+                isConnectingSource={connectSource === el.id}
+                activeTool={activeTool}
+              />
+            ))}
 
-             {/* Collaborative Real-time Cursors */}
-             {presenceCursors.map(cursor => (
-               <div
-                 key={cursor.id}
-                 className="absolute pointer-events-none transition-all duration-300 flex items-center gap-2"
-                 style={{ left: cursor.x, top: cursor.y }}
-               >
-                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                   <path d="M5.65376 12.3963L16.2753 2.18322C17.0733 1.41595 18.3615 1.99617 18.3377 3.09939L18.1098 13.6826C18.0898 14.6148 17.0768 15.1764 16.299 14.6622L11.5976 11.5541L7.75508 15.3966C7.03901 16.1127 5.82025 15.5228 5.92723 14.5126L6.23078 11.646C6.2625 11.3465 6.06209 11.0664 5.76012 10.9634L2.88371 9.98238C1.86877 9.63623 1.95679 8.16335 3.01168 7.94639L10.3703 6.43265C10.7483 6.35489 11.0261 6.05927 11.0772 5.67496L11.5721 1.94423C11.6983 0.992688 12.9818 0.741093 13.4566 1.57469L19.4674 12.126C19.986 13.0363 19.3496 14.1812 18.3079 14.2057L5.75376 14.502L5.65376 12.3963Z" fill={cursor.color} />
-                 </svg>
-                 <div 
-                   className="px-2 py-1 rounded-md text-[10px] font-black text-white whitespace-nowrap shadow-md"
-                   style={{ backgroundColor: cursor.color }}
-                 >
-                   {cursor.name}
-                 </div>
-               </div>
-             ))}
-           </div>
-         </div>
-       </div>
+            {/* Marquee selection rectangle */}
+            {renderMarquee()}
+          </div>
+        </div>
+      </div>
 
-       {/* Floating Canvas Action Bar (Bottom-Left) */}
-       <div className="absolute bottom-6 left-6 z-20 flex items-center gap-1.5 p-1.5 bg-white/70 dark:bg-zinc-900/70 border border-white/20 dark:border-zinc-800/80 backdrop-blur-2xl rounded-2xl shadow-xl">
-         <button
-           onClick={() => zoomAtCenter(false)}
-           className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-           title="Zoom Out"
-         >
-           <ZoomOut className="w-5 h-5" />
-         </button>
-         <span className="px-3 text-xs font-black text-zinc-600 dark:text-zinc-400 select-none">
-           {Math.round(zoom * 100)}%
-         </span>
-         <button
-           onClick={() => zoomAtCenter(true)}
-           className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-           title="Zoom In"
-         >
-           <ZoomIn className="w-5 h-5" />
-         </button>
+      {/* ─── Bottom-Left: Zoom Controls ─── */}
+      <div className={`absolute bottom-5 left-24 z-20 flex items-center gap-1 p-1 rounded-xl shadow-lg border backdrop-blur-xl ${
+        theme === 'dark' ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white/80 border-zinc-200/60'
+      }`}>
+        <button
+          onClick={() => zoomAtCenter(false)}
+          className={`p-2.5 rounded-lg transition-colors ${
+            theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+          }`}
+          title="Zoom Out"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <span className={`px-2 text-[11px] font-semibold select-none tabular-nums ${
+          theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'
+        }`}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          onClick={() => zoomAtCenter(true)}
+          className={`p-2.5 rounded-lg transition-colors ${
+            theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+          }`}
+          title="Zoom In"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <div className={`w-px h-5 mx-0.5 ${theme === 'dark' ? 'bg-zinc-700' : 'bg-zinc-200'}`} />
         <button
           onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); }}
-          className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-          title="Fit Board Content"
+          className={`p-2.5 rounded-lg transition-colors ${
+            theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+          }`}
+          title="Reset View"
         >
-          <Maximize className="w-5 h-5" />
+          <Maximize className="w-4 h-4" />
         </button>
-        <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
         <button
           onClick={() => setSnapToGrid(!snapToGrid)}
-          className={`p-3 rounded-xl transition-all ${
+          className={`p-2.5 rounded-lg transition-colors ${
             snapToGrid 
-              ? 'text-rose-500 bg-rose-500/10' 
-              : 'text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800'
+              ? (theme === 'dark' ? 'text-blue-400 bg-blue-500/10' : 'text-blue-500 bg-blue-500/10')
+              : (theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100')
           }`}
-          title="Toggle Grid Snapping"
+          title="Snap to Grid"
         >
-          <Grid className="w-5 h-5" />
+          <Grid className="w-4 h-4" />
         </button>
         <button
           onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
-          className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-          title="Toggle Canvas Theme"
+          className={`p-2.5 rounded-lg transition-colors ${
+            theme === 'dark' ? 'text-amber-400 hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+          }`}
+          title="Toggle Theme"
         >
-          {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-zinc-500" />}
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       </div>
 
-      {/* Floating Canvas History Bar (Top-Right) */}
-      <div className="absolute top-6 right-6 z-20 flex items-center gap-3">
-        <div className="flex items-center gap-1.5 p-1.5 bg-white/70 dark:bg-zinc-900/70 border border-white/20 dark:border-zinc-800/80 backdrop-blur-2xl rounded-2xl shadow-xl">
+      {/* ─── Top-Right: History + Actions ─── */}
+      <div className="absolute top-5 right-5 z-20 flex items-center gap-2">
+        <div className={`flex items-center gap-1 p-1 rounded-xl shadow-lg border backdrop-blur-xl ${
+          theme === 'dark' ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white/80 border-zinc-200/60'
+        }`}>
           <button
             onClick={handleUndo}
             disabled={historyIndex <= 0}
-            className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:hover:text-zinc-500 rounded-xl transition-all"
-            title="Undo (Ctrl+Z)"
+            className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 ${
+              theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+            }`}
+            title="Undo"
           >
-            <Undo className="w-5 h-5" />
+            <Undo className="w-4 h-4" />
           </button>
           <button
             onClick={handleRedo}
             disabled={historyIndex >= history.length - 1}
-            className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:hover:text-zinc-500 rounded-xl transition-all"
-            title="Redo (Ctrl+Y)"
+            className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 ${
+              theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+            }`}
+            title="Redo"
           >
-            <Redo className="w-5 h-5" />
+            <Redo className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1.5 bg-white/70 dark:bg-zinc-900/70 border border-white/20 dark:border-zinc-800/80 backdrop-blur-2xl rounded-2xl shadow-xl">
+        <div className={`flex items-center gap-1 p-1 rounded-xl shadow-lg border backdrop-blur-xl ${
+          theme === 'dark' ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white/80 border-zinc-200/60'
+        }`}>
           <button
             onClick={() => setShowShareModal(true)}
-            className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-            title="Share Board"
+            className={`p-2.5 rounded-lg transition-colors ${
+              theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+            }`}
+            title="Share"
           >
-            <Share2 className="w-5 h-5" />
+            <Share2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowExportModal(true)}
-            className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-            title="Export Layout"
+            className={`p-2.5 rounded-lg transition-colors ${
+              theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+            }`}
+            title="Export"
           >
-            <Download className="w-5 h-5" />
+            <Download className="w-4 h-4" />
           </button>
           <button
             onClick={toggleFullscreen}
-            className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-            title={isFullscreen ? "Minimize Canvas" : "Fullscreen Canvas"}
+            className={`p-2.5 rounded-lg transition-colors ${
+              theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+            }`}
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           >
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
           <button
             onClick={onBackToBoards}
-            className="p-3 text-zinc-500 hover:text-rose-500 hover:bg-white/10 dark:hover:bg-zinc-800 rounded-xl transition-all"
-            title="All Boards"
+            className={`p-2.5 rounded-lg transition-colors ${
+              theme === 'dark' ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+            }`}
+            title="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Milanote-Style Anchored Left Sidebar */}
-      <div className="absolute top-0 bottom-0 left-0 w-20 z-20 flex flex-col justify-between py-4 bg-white dark:bg-[#1E1E1E] border-r border-zinc-200 dark:border-zinc-800 transition-colors duration-300">
-        
-        {/* Top Section: Back Button and Main Tools */}
-        <div className="flex flex-col items-center w-full gap-2">
-          {/* Back to boards arrow */}
+      {/* ─── Left Sidebar ─── */}
+      <div className={`absolute top-0 bottom-0 left-0 w-20 z-20 flex flex-col justify-between py-4 border-r transition-colors duration-300 ${
+        theme === 'dark' ? 'bg-[#1E1E1E] border-zinc-800' : 'bg-white border-zinc-200/60'
+      }`}>
+        <div className="flex flex-col items-center w-full gap-1.5">
+          {/* Back button */}
           <button
             onClick={onBackToBoards}
-            className="w-12 h-12 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all mb-2"
-            title="Back to All Boards"
+            className={`w-11 h-11 flex items-center justify-center rounded-lg transition-colors mb-2 ${
+              theme === 'dark' ? 'text-zinc-500 hover:text-white hover:bg-zinc-800' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
+            }`}
+            title="Back"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4.5 h-4.5" />
           </button>
           
-          <div className="w-12 h-px bg-zinc-200 dark:bg-zinc-800 mb-2" />
+          <div className={`w-10 h-px mb-1 ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
 
-          {/* Tools List */}
-          <div className="flex flex-col items-center w-full gap-1 px-1">
-            {/* Note Tool */}
-            <button
-              onClick={() => { setPendingPlacement('note'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'note' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Add Note Card"
-            >
-              <StickyNote className="w-5 h-5 text-yellow-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Note</span>
-            </button>
+          {/* Tool buttons */}
+          <div className="flex flex-col items-center w-full gap-0.5 px-1">
+            {sidebarTools.map(tool => (
+              <button
+                key={tool.type}
+                onClick={() => { setPendingPlacement(tool.type); setActiveTool('select'); }}
+                className={`w-[60px] py-2 flex flex-col items-center gap-0.5 rounded-lg transition-all ${
+                  pendingPlacement === tool.type 
+                    ? 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/20' 
+                    : theme === 'dark'
+                      ? 'text-zinc-500 hover:text-white hover:bg-zinc-800'
+                      : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+                }`}
+                title={`Add ${tool.label}`}
+              >
+                <tool.icon className={`w-4.5 h-4.5 ${pendingPlacement === tool.type ? 'text-blue-500' : tool.color}`} />
+                <span className={`text-[8px] font-semibold uppercase tracking-wider ${
+                  pendingPlacement === tool.type 
+                    ? 'text-blue-500'
+                    : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'
+                }`}>{tool.label}</span>
+              </button>
+            ))}
 
-            {/* Link Tool */}
-            <button
-              onClick={() => { setPendingPlacement('link'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'link' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Embed Web Link"
-            >
-              <LinkIcon className="w-5 h-5 text-indigo-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Link</span>
-            </button>
-
-            {/* To-Do Checklist */}
-            <button
-              onClick={() => { setPendingPlacement('todo'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'todo' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Drop Checklist"
-            >
-              <CheckSquare className="w-5 h-5 text-amber-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">To-Do</span>
-            </button>
-
-            {/* Line / Connection Tool */}
+            {/* Connector line tool */}
             <button
               onClick={() => {
                 setActiveTool(activeTool === 'connect' ? 'select' : 'connect');
                 setConnectSource(null);
                 setPendingPlacement(null);
               }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 rounded-xl transition-all ${
+              className={`w-[60px] py-2 flex flex-col items-center gap-0.5 rounded-lg transition-all ${
                 activeTool === 'connect'
-                  ? 'bg-indigo-500/15 text-indigo-500 ring-2 ring-indigo-500/30'
-                  : 'text-zinc-500 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  ? 'bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20'
+                  : theme === 'dark'
+                    ? 'text-zinc-500 hover:text-white hover:bg-zinc-800'
+                    : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
               }`}
-              title="Draw Connection Arrow"
+              title="Draw Line"
             >
-              <ArrowRight className="w-5 h-5 text-indigo-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Line</span>
-            </button>
-
-            {/* Board Link (Nested sub-board) */}
-            <button
-              onClick={() => { setPendingPlacement('board_link'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'board_link' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Create Sub-Board"
-            >
-              <FolderOpen className="w-5 h-5 text-teal-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Board</span>
-            </button>
-
-            {/* Kanban Column */}
-            <button
-              onClick={() => { setPendingPlacement('column'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'column' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Add Column Container"
-            >
-              <Columns className="w-5 h-5 text-purple-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Column</span>
-            </button>
-
-            {/* Text Label */}
-            <button
-              onClick={() => { setPendingPlacement('text'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'text' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Add Text Label"
-            >
-              <Type className="w-5 h-5 text-blue-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Text</span>
-            </button>
-
-            {/* Image Insertion */}
-            <button
-              onClick={() => { setPendingPlacement('image'); setActiveTool('select'); }}
-              className={`w-16 py-2 flex flex-col items-center gap-1 hover:text-rose-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all ${
-                pendingPlacement === 'image' ? 'bg-rose-500/10 text-rose-500 ring-2 ring-rose-500/20' : 'text-zinc-500'
-              }`}
-              title="Insert Image Card"
-            >
-              <ImageIcon className="w-5 h-5 text-emerald-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Image</span>
+              <ArrowRight className={`w-4.5 h-4.5 ${activeTool === 'connect' ? 'text-indigo-500' : 'text-indigo-400'}`} />
+              <span className={`text-[8px] font-semibold uppercase tracking-wider ${
+                activeTool === 'connect' ? 'text-indigo-500' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'
+              }`}>Line</span>
             </button>
           </div>
         </div>
 
-        {/* Bottom Section: Trash / Erase */}
+        {/* Bottom: Trash */}
         <div className="flex flex-col items-center w-full px-1">
           <button
             onClick={() => setActiveTool(activeTool === 'delete' ? 'select' : 'delete')}
-            className={`w-16 py-2.5 flex flex-col items-center gap-1 rounded-xl transition-all ${
+            className={`w-[60px] py-2 flex flex-col items-center gap-0.5 rounded-lg transition-all ${
               activeTool === 'delete'
                 ? 'bg-red-500 text-white shadow-md'
-                : 'text-zinc-400 hover:text-red-500 hover:bg-red-500/10'
+                : theme === 'dark'
+                  ? 'text-zinc-500 hover:text-red-400 hover:bg-red-500/10'
+                  : 'text-zinc-400 hover:text-red-500 hover:bg-red-500/10'
             }`}
-            title="Trash / Deletion Tool"
+            title="Delete Tool"
           >
-            <Trash2 className="w-5 h-5" />
-            <span className={`text-[9px] font-black uppercase tracking-widest ${activeTool === 'delete' ? 'text-white' : 'text-zinc-400'}`}>Trash</span>
+            <Trash2 className="w-4.5 h-4.5" />
+            <span className={`text-[8px] font-semibold uppercase tracking-wider ${
+              activeTool === 'delete' ? 'text-white' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'
+            }`}>Trash</span>
           </button>
         </div>
       </div>
 
-      {/* Floating Canvas Minimap (Bottom-Right) */}
-      <div className="absolute bottom-6 right-6 z-20 p-2 bg-white/70 dark:bg-zinc-900/70 border border-white/20 dark:border-zinc-800/80 backdrop-blur-2xl rounded-2xl shadow-xl w-40 h-32 flex flex-col justify-between">
-        <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Board Minimap</span>
-        <div className="relative flex-1 bg-zinc-200/50 dark:bg-black/40 border border-white/5 rounded-lg overflow-hidden flex items-center justify-center">
-          {/* Mock elements dots */}
-          <div className="absolute w-2 h-2 bg-rose-500 rounded-full" style={{ left: '30%', top: '40%' }} />
-          <div className="absolute w-2.5 h-1.5 bg-yellow-500 rounded" style={{ left: '55%', top: '30%' }} />
-          <div className="absolute w-2 h-2 bg-indigo-500 rounded-full" style={{ left: '70%', top: '65%' }} />
-          {/* Active viewport box */}
+      {/* ─── Bottom-Right: Minimap ─── */}
+      <div className={`absolute bottom-5 right-5 z-20 p-2 rounded-xl shadow-lg border backdrop-blur-xl w-40 h-28 flex flex-col gap-1 ${
+        theme === 'dark' ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white/80 border-zinc-200/60'
+      }`}>
+        <span className={`text-[7px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+          Minimap
+        </span>
+        <div className={`relative flex-1 rounded-lg overflow-hidden ${
+          theme === 'dark' ? 'bg-zinc-800/60' : 'bg-zinc-100/80'
+        }`}>
+          {/* Real element dots */}
+          {minimapData.elements.map(el => (
+            <div
+              key={el.id}
+              className="absolute rounded-sm"
+              style={{
+                left: el.x,
+                top: el.y,
+                width: Math.max(3, el.w),
+                height: Math.max(2, el.h),
+                backgroundColor: el.color,
+                opacity: 0.7
+              }}
+            />
+          ))}
+          {/* Viewport window */}
           <div 
-            className="absolute border border-rose-500 bg-rose-500/10 rounded" 
+            className="absolute border border-blue-500 bg-blue-500/10 rounded-sm" 
             style={{ 
-              left: `${Math.max(10, Math.min(80, 40 - pan.x/100))}%`, 
-              top: `${Math.max(10, Math.min(80, 40 - pan.y/100))}%`,
-              width: `${Math.max(20, 50 / zoom)}px`,
-              height: `${Math.max(15, 40 / zoom)}px`
+              left: minimapData.viewportRect.left,
+              top: minimapData.viewportRect.top,
+              width: minimapData.viewportRect.width,
+              height: minimapData.viewportRect.height
             }} 
           />
         </div>
       </div>
 
-      {/* Export layout modal */}
+      {/* ─── Export Modal ─── */}
       <AnimatePresence>
         {showExportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl"
+              className={`w-full max-w-sm rounded-2xl p-6 shadow-2xl ${
+                theme === 'dark' ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-zinc-200'
+              }`}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold font-space-grotesk text-zinc-900 dark:text-white">Export board</h3>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>Export board</h3>
                 <button 
                   onClick={() => setShowExportModal(false)}
-                  className="p-2 text-zinc-500 hover:text-white rounded-lg"
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    theme === 'dark' ? 'text-zinc-500 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+                  }`}
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-zinc-500 text-sm mb-6 font-medium">Download a complete high-res snapshot of your workspace layout to share with teammates.</p>
-              <div className="grid grid-cols-2 gap-4">
+              <p className={`text-sm mb-5 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                Download a snapshot of your workspace.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
                 <button 
                   onClick={() => handleExport('png')}
-                  className="py-4 bg-rose-500 hover:bg-rose-600 text-white font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-md"
+                  className="py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-xl transition-colors"
                 >
-                  Download PNG
+                  PNG
                 </button>
                 <button 
                   onClick={() => handleExport('pdf')}
-                  className="py-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white font-black text-sm uppercase tracking-wider rounded-2xl transition-all"
+                  className={`py-3 font-semibold text-sm rounded-xl transition-colors ${
+                    theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200'
+                  }`}
                 >
-                  Download PDF
+                  PDF
                 </button>
               </div>
             </motion.div>
@@ -957,56 +1103,70 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
         )}
       </AnimatePresence>
 
-      {/* Share / Invite modal */}
+      {/* ─── Share Modal ─── */}
       <AnimatePresence>
         {showShareModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl"
+              className={`w-full max-w-md rounded-2xl p-6 shadow-2xl ${
+                theme === 'dark' ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-zinc-200'
+              }`}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold font-space-grotesk text-zinc-900 dark:text-white">Invite collaborators</h3>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>Share board</h3>
                 <button 
                   onClick={() => setShowShareModal(false)}
-                  className="p-2 text-zinc-500 hover:text-white rounded-lg"
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    theme === 'dark' ? 'text-zinc-500 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+                  }`}
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Collaborator Email</label>
-                  <div className="flex gap-2 mt-2">
+                  <label className={`text-[10px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    Email
+                  </label>
+                  <div className="flex gap-2 mt-1.5">
                     <input 
                       type="email" 
                       placeholder="teammate@example.com" 
-                      className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800/50 border border-transparent dark:border-zinc-700 rounded-xl outline-none text-sm"
+                      className={`flex-1 px-3 py-2.5 rounded-lg outline-none text-sm ${
+                        theme === 'dark' ? 'bg-zinc-800 border border-zinc-700 text-white' : 'bg-zinc-100 border border-zinc-200 text-zinc-800'
+                      }`}
                     />
                     <button 
-                      onClick={() => { toast.success('Invite sent successfully!'); setShowShareModal(false); }}
-                      className="px-6 bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm rounded-xl transition-all"
+                      onClick={() => { toast.success('Invite sent'); setShowShareModal(false); }}
+                      className="px-5 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-lg transition-colors"
                     >
                       Invite
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Shareable Board Link</label>
-                  <div className="flex gap-2 mt-2">
+                  <label className={`text-[10px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    Shareable Link
+                  </label>
+                  <div className="flex gap-2 mt-1.5">
                     <input 
                       type="text" 
                       readOnly 
-                      value={`https://cognify.app/workspace/board-${board.id}`} 
-                      className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800/50 border border-transparent dark:border-zinc-700 rounded-xl outline-none text-sm text-zinc-500 select-all"
+                      value={`https://cognify.app/board/${board.id}`} 
+                      className={`flex-1 px-3 py-2.5 rounded-lg outline-none text-sm select-all ${
+                        theme === 'dark' ? 'bg-zinc-800 border border-zinc-700 text-zinc-400' : 'bg-zinc-100 border border-zinc-200 text-zinc-500'
+                      }`}
                     />
                     <button 
-                      onClick={() => { navigator.clipboard.writeText(`https://cognify.app/workspace/board-${board.id}`); toast.success('Link copied to clipboard!'); }}
-                      className="px-6 bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-white border border-zinc-300 dark:border-zinc-700 font-bold text-sm rounded-xl transition-all"
+                      onClick={() => { navigator.clipboard.writeText(`https://cognify.app/board/${board.id}`); toast.success('Copied'); }}
+                      className={`px-5 font-semibold text-sm rounded-lg transition-colors ${
+                        theme === 'dark' ? 'bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700' : 'bg-zinc-200 text-zinc-800 border border-zinc-300 hover:bg-zinc-300'
+                      }`}
                     >
-                      Copy Link
+                      Copy
                     </button>
                   </div>
                 </div>
