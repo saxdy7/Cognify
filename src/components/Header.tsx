@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Search, Plus, Bell, User, Sparkles, Command, ShieldCheck, Zap, Menu } from 'lucide-react';
+import { Search, Plus, Bell, User, Sparkles, Command, ShieldCheck, Zap, Menu, Bookmark, Key } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   onAddBookmark: () => void;
@@ -12,9 +13,11 @@ interface HeaderProps {
   onSearchChange: (query: string) => void;
   containerName?: string;
   onMenuClick?: () => void;
+  viewType?: 'bookmarks' | 'passwords';
+  onViewTypeChange?: (type: 'bookmarks' | 'passwords') => void;
 }
 
-export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, searchQuery, onSearchChange, containerName = 'All Bookmarks', onMenuClick }: HeaderProps) {
+export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, searchQuery, onSearchChange, containerName = 'All Bookmarks', onMenuClick, viewType = 'bookmarks', onViewTypeChange }: HeaderProps) {
   return (
     <header className="h-20 sm:h-24 md:h-28 lg:h-32 bg-transparent sticky top-0 z-30 px-4 sm:px-6 md:px-8 lg:px-12 flex items-center justify-between">
       {/* Mobile Menu Button */}
@@ -26,6 +29,36 @@ export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, se
       </button>
 
       <div className="flex items-center gap-3 sm:gap-6 md:gap-8 lg:gap-12 flex-1 min-w-0">
+        {/* View Type Toggle */}
+        {onViewTypeChange && (
+          <div className="hidden lg:flex items-center gap-2 p-1.5 bg-white/5 dark:bg-black/20 backdrop-blur-xl border border-white/10 dark:border-zinc-800/50 rounded-[1.5rem] shadow-2xl">
+            <button
+              onClick={() => onViewTypeChange('bookmarks')}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all",
+                viewType === 'bookmarks' 
+                  ? "bg-orange-500 text-white shadow-lg" 
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Bookmark className="w-4 h-4" />
+              <span className="hidden xl:inline">Bookmarks</span>
+            </button>
+            <button
+              onClick={() => onViewTypeChange('passwords')}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all",
+                viewType === 'passwords' 
+                  ? "bg-indigo-500 text-white shadow-lg" 
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Key className="w-4 h-4" />
+              <span className="hidden xl:inline">Passwords</span>
+            </button>
+          </div>
+        )}
+
         {/* Breadcrumb / Title */}
         <div className="flex flex-col min-w-0">
           <div className="hidden sm:flex items-center gap-2 mb-1">
@@ -34,7 +67,7 @@ export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, se
           </div>
           <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black font-space-grotesk tracking-tighter text-zinc-900 dark:text-white flex items-center gap-2 lg:gap-4 truncate">
             <span className="truncate">{containerName}</span>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-500 animate-pulse flex-shrink-0" />
+            <div className={cn("w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full animate-pulse flex-shrink-0", "bg-orange-500")} />
           </h1>
         </div>
 

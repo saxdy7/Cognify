@@ -13,16 +13,16 @@ const features = [
     color: 'bg-orange-500',
   },
   {
+    title: 'Secure Vault',
+    description: 'Password manager with military-grade encryption and smart generation.',
+    icon: Brain,
+    color: 'bg-indigo-500',
+  },
+  {
     title: 'Instant Flow',
     description: 'Beautiful Microlink-powered previews for every capture.',
     icon: Zap,
     color: 'bg-orange-400',
-  },
-  {
-    title: 'Neural Sync',
-    description: 'Summarize articles and extract deep insights instantly.',
-    icon: Brain,
-    color: 'bg-orange-600',
   },
   {
     title: 'God-level UI',

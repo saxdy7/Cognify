@@ -53,7 +53,7 @@ export const LandingHero = () => {
           className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-2xl mx-auto mb-12 md:mb-16 leading-relaxed font-medium px-4"
         >
 
-          Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with AI-powered organization.
+          Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with <span className="text-indigo-400 font-bold">AI-powered organization</span> and a <span className="text-indigo-400 font-bold">secure password vault</span> — all in one place.
         </motion.p>
 
         <motion.div

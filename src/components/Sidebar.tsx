@@ -17,6 +17,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
+  viewType?: 'bookmarks' | 'passwords';
 }
 
 // Helper component for animated text
@@ -41,7 +42,8 @@ export function Sidebar({
   isCollapsed,
   onToggleCollapse,
   isMobileOpen = false,
-  onMobileClose
+  onMobileClose,
+  viewType = 'bookmarks'
 }: SidebarProps) {
   return (
     <>
