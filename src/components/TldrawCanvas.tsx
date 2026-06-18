@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Tldraw, createShapeId } from 'tldraw';
 import 'tldraw/tldraw.css';
-import { ArrowLeft, Moon, Sun, CloudLightning, Loader2 } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, CloudLightning, Loader2, Maximize, Minimize } from 'lucide-react';
 import { CanvasBoard } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -21,6 +21,8 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
   const [savingStatus, setSavingStatus] = useState<'synced' | 'saving' | 'error'>('synced');
   const [loading, setLoading] = useState(true);
   const [initialSnapshot, setInitialSnapshot] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // 1. Fetch initial board data from database on mount
   useEffect(() => {
@@ -45,6 +47,25 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
 
     fetchBoardSnapshot();
   }, [board.id]);
+
+  // Sync browser fullscreen state
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
 
   // 2. Setup template initialization
   const initializeTemplate = useCallback((editorInstance: any, templateId: string) => {
@@ -301,7 +322,7 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
   }
 
   return (
-    <div className="w-full h-full relative overflow-hidden flex flex-col bg-zinc-950">
+    <div ref={containerRef} className="w-full h-full relative overflow-hidden flex flex-col bg-zinc-950">
       {/* Visual Overlay Header */}
       <div className="absolute top-4 left-4 z-[9999] flex items-center gap-3">
         <button
@@ -327,8 +348,15 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
         </div>
       </div>
 
-      {/* Floating Theme Controller */}
-      <div className="absolute top-4 right-4 z-[9999]">
+      {/* Floating Controls */}
+      <div className="absolute top-4 right-4 z-[9999] flex items-center gap-2">
+        <button
+          onClick={toggleFullscreen}
+          className="w-11 h-11 flex items-center justify-center bg-black/80 hover:bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+          title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+        </button>
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
           className="w-11 h-11 flex items-center justify-center bg-black/80 hover:bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
