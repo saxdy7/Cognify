@@ -264,6 +264,148 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
     }
   }, [selectedId]);
 
+  // ─────────────────────────── Paste / Drop (images, links, text, files) ───────────────────────────
+  // Upload an image/video to Supabase storage; fall back to an inline base64 data URL
+  const uploadMedia = useCallback(async (file: File): Promise<string> => {
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${ext}`;
+      const { error } = await supabase.storage.from('canvas-assets').upload(path, file, { cacheControl: '3600', upsert: false });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('canvas-assets').getPublicUrl(path);
+      return publicUrl;
+    } catch {
+      // Storage bucket missing / blocked → embed as base64 so it still works
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  }, [userId]);
+
+  const createImageFromFile = useCallback(async (file: File, at?: { x: number; y: number }) => {
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      toast.error('Only images or videos can be added this way');
+      return;
+    }
+    const tid = toast.loading(file.type.startsWith('video/') ? 'Uploading video…' : 'Uploading image…');
+    try {
+      const src = await uploadMedia(file);
+      const preset = file.type.startsWith('video/')
+        ? { width: 360, height: 240, content: { src, caption: file.name } }
+        : { content: { src, caption: file.name } };
+      await addElement('image', preset, at);
+      toast.success('Added to canvas', { id: tid });
+    } catch (err) {
+      console.error('Image paste/drop failed:', err);
+      toast.error('Failed to add media', { id: tid });
+    }
+  }, [uploadMedia, addElement]);
+
+  const createFileFromFile = useCallback(async (file: File, at?: { x: number; y: number }) => {
+    await addElement('file', {
+      content: {
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        fileType: file.type || 'document',
+      },
+    }, at);
+    toast.success(`Added "${file.name}"`);
+  }, [addElement]);
+
+  const createLinkFromUrl = useCallback(async (url: string, at?: { x: number; y: number }) => {
+    let hostname = 'link';
+    try { hostname = new URL(url).hostname.replace(/^www\./, ''); } catch { /* keep default */ }
+    const baseContent = {
+      url,
+      title: hostname,
+      description: '',
+      image: '',
+      favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+    };
+    const el = await addElement('link', { width: 300, height: 220, content: baseContent }, at);
+    if (!el) return;
+    // Enrich with real metadata (title / preview image). Harmless for video links — the card embeds those directly.
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        handleUpdate(el.id, {
+          content: {
+            url,
+            title: d.title || hostname,
+            description: d.description || '',
+            image: d.preview_image_url || '',
+            favicon: d.logo_url || baseContent.favicon,
+          },
+        });
+      }
+    } catch { /* metadata is best-effort */ }
+  }, [addElement, handleUpdate]);
+
+  const createNoteFromText = useCallback(async (text: string, at?: { x: number; y: number }) => {
+    await addElement('note', { content: { title: '', body: text } }, at);
+  }, [addElement]);
+
+  // Global paste handler
+  useEffect(() => {
+    const onPaste = async (e: ClipboardEvent) => {
+      const cd = e.clipboardData;
+      if (!cd) return;
+
+      // 1) Image from clipboard (screenshots, copied images)
+      const imageItem = Array.from(cd.items || []).find(i => i.type.startsWith('image/'));
+      const fileImage = Array.from(cd.files || []).find(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+      const at = lastPointerRef.current || undefined;
+
+      if (imageItem) {
+        const file = imageItem.getAsFile();
+        if (file) { e.preventDefault(); await createImageFromFile(file, at); return; }
+      }
+      if (fileImage) { e.preventDefault(); await createImageFromFile(fileImage, at); return; }
+
+      // 2) Text / URL — but don't hijack paste while editing a card field
+      const active = document.activeElement as HTMLElement | null;
+      const editing = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (editing) return;
+
+      const text = (cd.getData('text/plain') || '').trim();
+      if (!text) return;
+      e.preventDefault();
+      if (/^https?:\/\/\S+$/i.test(text)) await createLinkFromUrl(text, at);
+      else await createNoteFromText(text, at);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [createImageFromFile, createLinkFromUrl, createNoteFromText]);
+
+  // Drag & drop onto the surface
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const at = screenToCanvas(e.clientX, e.clientY);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length) {
+      let i = 0;
+      for (const f of files) {
+        const spot = { x: at.x + i * 24, y: at.y + i * 24 };
+        if (f.type.startsWith('image/') || f.type.startsWith('video/')) await createImageFromFile(f, spot);
+        else await createFileFromFile(f, spot);
+        i++;
+      }
+      return;
+    }
+    const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    if (url && /^https?:\/\/\S+$/i.test(url.trim())) await createLinkFromUrl(url.trim(), at);
+    else if (url) await createNoteFromText(url.trim(), at);
+  }, [screenToCanvas, createImageFromFile, createFileFromFile, createLinkFromUrl, createNoteFromText]);
+
   // ─────────────────────────── Connectors ───────────────────────────
   const createConnector = useCallback(async (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
@@ -535,7 +677,11 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
         <div
           ref={surfaceRef}
           onMouseDown={handleSurfaceMouseDown}
+          onMouseMove={(e) => { lastPointerRef.current = screenToCanvas(e.clientX, e.clientY); }}
           onWheel={handleWheel}
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setIsDragOver(false); }}
           className={`relative flex-1 overflow-hidden ${activeTool === 'connect' ? 'cursor-crosshair' : activeTool === 'delete' ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
           style={{
             backgroundImage: `radial-gradient(circle, ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'} 1px, transparent 1px)`,
@@ -586,7 +732,16 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <LayoutGrid className={`w-10 h-10 mb-3 ${dark ? 'text-zinc-700' : 'text-zinc-300'}`} />
               <p className={`text-sm font-bold ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Your canvas is empty</p>
-              <p className={`text-xs mt-1 ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>Pick a tool on the left to add your first card</p>
+              <p className={`text-xs mt-1 ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>Pick a tool on the left, or paste / drop an image or link</p>
+            </div>
+          )}
+
+          {/* Drag-over overlay */}
+          {isDragOver && (
+            <div className="absolute inset-3 z-[60] rounded-3xl border-2 border-dashed border-rose-500 bg-rose-500/10 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none">
+              <Upload className="w-10 h-10 text-rose-500 mb-3" />
+              <p className="text-sm font-black uppercase tracking-widest text-rose-500">Drop to add to canvas</p>
+              <p className="text-xs mt-1 text-rose-400/80">Images, videos, files & links</p>
             </div>
           )}
 
