@@ -9,9 +9,13 @@ CREATE TABLE IF NOT EXISTS public.canvas_boards (
   background_color TEXT DEFAULT '#F4F4F0',
   is_dark_mode BOOLEAN DEFAULT FALSE,
   parent_board_id UUID REFERENCES public.canvas_boards(id) ON DELETE CASCADE,
+  tldraw_snapshot JSONB, -- legacy snapshot / template bootstrap flag ({ isNewTemplate, templateId })
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure the column exists on databases created before it was added
+ALTER TABLE public.canvas_boards ADD COLUMN IF NOT EXISTS tldraw_snapshot JSONB;
 
 -- Create canvas_elements table
 CREATE TABLE IF NOT EXISTS public.canvas_elements (

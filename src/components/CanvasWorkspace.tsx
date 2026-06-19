@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { CanvasBoard } from '@/types';
 
-// Load TldrawCanvas client-side only (SSR: false)
-const TldrawCanvas = dynamic(
-  () => import('./TldrawCanvas').then((m) => m.TldrawCanvas),
+// Load the custom Milanote-style canvas client-side only (SSR: false)
+const MilanoteCanvas = dynamic(
+  () => import('./MilanoteCanvas').then((m) => m.MilanoteCanvas),
   {
     ssr: false,
     loading: () => (
@@ -31,7 +31,7 @@ export function CanvasWorkspace({ board, onBackToBoards, userId }: CanvasWorkspa
 
   return (
     <div className="relative w-full h-[calc(100vh-120px)] rounded-[2rem] border border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl overflow-hidden bg-zinc-950">
-      <TldrawCanvas
+      <MilanoteCanvas
         board={board}
         onBackToBoards={onBackToBoards}
         userId={userId}
