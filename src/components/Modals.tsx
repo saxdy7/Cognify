@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Link as LinkIcon, Type, FileText, Tag as TagIcon, FolderPlus, Sparkles, Zap, ShieldCheck } from 'lucide-react';
+import { X, Loader2, Link as LinkIcon, Type, FileText, Tag as TagIcon, FolderPlus, Sparkles, Zap, ShieldCheck, Presentation } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
