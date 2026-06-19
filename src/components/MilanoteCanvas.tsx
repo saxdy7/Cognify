@@ -5,7 +5,7 @@ import {
   ArrowLeft, Moon, Sun, Loader2, Maximize, Minimize, Plus, Minus,
   StickyNote, Link as LinkIcon, CheckSquare, Spline, LayoutGrid, Columns,
   MessageSquare, MoreHorizontal, Image as ImageIcon, Upload, Trash2,
-  MousePointer2, Type, Video, FileText, Frame,
+  MousePointer2, Type, Video, FileText, Frame, Pencil, Code2,
 } from 'lucide-react';
 import { CanvasBoard, CanvasElement, CanvasConnector } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +33,9 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; color: s
   todo: { width: 250, height: 260, color: '#FFFFFF', content: { title: '', tasks: [] } },
   column: { width: 300, height: 420, color: '#FFFFFF', content: { title: 'New Column' } },
   board_link: { width: 200, height: 150, color: '#FFFFFF', content: { title: '' } },
+  sketch: { width: 360, height: 300, color: '#FFFFFF', content: { strokes: [] } },
+  heading: { width: 320, height: 72, color: '#FFFFFF', content: { text: '' } },
+  code: { width: 320, height: 220, color: '#FFFFFF', content: { code: '' } },
 };
 
 interface ToolbarItem {
@@ -49,15 +52,18 @@ const MAIN_TOOLS: ToolbarItem[] = [
   { key: 'link', label: 'Link', icon: <LinkIcon className="w-5 h-5" />, type: 'link' },
   { key: 'todo', label: 'To-do', icon: <CheckSquare className="w-5 h-5" />, type: 'todo' },
   { key: 'line', label: 'Line', icon: <Spline className="w-5 h-5" />, action: 'connect' },
+  { key: 'sketch', label: 'Draw', icon: <Pencil className="w-5 h-5" />, type: 'sketch' },
   { key: 'board', label: 'Board', icon: <LayoutGrid className="w-5 h-5" />, type: 'board_link' },
   { key: 'column', label: 'Column', icon: <Columns className="w-5 h-5" />, type: 'column' },
   { key: 'comment', label: 'Comment', icon: <MessageSquare className="w-5 h-5" />, type: 'note', preset: { content: { title: 'Comment', body: '' }, color: '#DBEAFE' } },
 ];
 
 const MORE_TOOLS: ToolbarItem[] = [
-  { key: 'heading', label: 'Heading', icon: <Type className="w-4 h-4" />, type: 'text' },
+  { key: 'heading', label: 'Heading', icon: <Type className="w-4 h-4" />, type: 'heading' },
+  { key: 'text', label: 'Text', icon: <Type className="w-4 h-4" />, type: 'text' },
   { key: 'video', label: 'Video', icon: <Video className="w-4 h-4" />, type: 'link', preset: { width: 320, height: 200 } },
   { key: 'document', label: 'Document', icon: <FileText className="w-4 h-4" />, type: 'file' },
+  { key: 'code', label: 'Code', icon: <Code2 className="w-4 h-4" />, type: 'code' },
   { key: 'frame', label: 'Frame', icon: <Frame className="w-4 h-4" />, type: 'column' },
 ];
 
@@ -678,6 +684,11 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
           ref={surfaceRef}
           onMouseDown={handleSurfaceMouseDown}
           onMouseMove={(e) => { lastPointerRef.current = screenToCanvas(e.clientX, e.clientY); }}
+          onDoubleClick={(e) => {
+            if ((e.target as HTMLElement).closest('[data-card="true"]')) return;
+            if (activeTool !== 'select') return;
+            addElement('note', undefined, screenToCanvas(e.clientX, e.clientY));
+          }}
           onWheel={handleWheel}
           onDrop={handleDrop}
           onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}

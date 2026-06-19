@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Check, CheckSquare, Plus, Trash2, Link as LinkIcon, 
-  ExternalLink, FileText, Download, ArrowRight, Palette, 
-  Image as ImageIcon, Search, ChevronRight, MessageSquare, FolderOpen
+import {
+  Check, CheckSquare, Plus, Trash2, Link as LinkIcon,
+  ExternalLink, FileText, Download, ArrowRight, Palette,
+  Image as ImageIcon, Search, ChevronRight, MessageSquare, FolderOpen,
+  Pencil, Eraser, Undo2, Code2
 } from 'lucide-react';
 import { CanvasElement } from '@/types';
 import { toast } from 'sonner';
@@ -151,6 +152,7 @@ export function CanvasCard({
       target.isContentEditable ||
       target.closest('button') || target.closest('a') || target.closest('label') ||
       target.closest('iframe') || target.closest('video') ||
+      target.closest('[data-no-drag="true"]') ||
       target.dataset.resizeHandle === 'true'
     ) {
       return;
@@ -676,6 +678,41 @@ export function CanvasCard({
           </div>
         );
 
+      case 'heading':
+        return (
+          <div className="flex items-center h-full select-text pointer-events-auto">
+            <textarea
+              value={element.content.text || ''}
+              onChange={(e) => onUpdate(element.id, { content: { ...element.content, text: e.target.value } })}
+              placeholder="Heading"
+              className={`w-full bg-transparent font-black text-2xl leading-tight outline-none resize-none font-space-grotesk ${
+                theme === 'dark' ? 'text-white placeholder:text-zinc-600' : 'text-zinc-900 placeholder:text-zinc-300'
+              }`}
+            />
+          </div>
+        );
+
+      case 'code':
+        return (
+          <div className="flex flex-col h-full pointer-events-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 flex items-center gap-1">
+                <Code2 className="w-3 h-3" /> Snippet
+              </span>
+            </div>
+            <textarea
+              value={element.content.code || ''}
+              onChange={(e) => onUpdate(element.id, { content: { ...element.content, code: e.target.value } })}
+              placeholder="// paste or type code…"
+              spellCheck={false}
+              className="w-full flex-1 bg-zinc-900 text-emerald-300 rounded-lg p-3 text-[11px] leading-relaxed font-mono outline-none resize-none placeholder:text-zinc-600"
+            />
+          </div>
+        );
+
+      case 'sketch':
+        return <SketchPad element={element} theme={theme} zoom={zoom} onUpdate={onUpdate} />;
+
       case 'board_link':
         return (
           <div className="flex flex-col h-full pointer-events-auto justify-center text-center">
@@ -846,6 +883,144 @@ export function CanvasCard({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────── Freehand sketch / draw pad ───────────────────────────
+type Stroke = { color: string; size: number; points: number[][] };
+
+const SKETCH_COLORS = ['#0F172A', '#EF4444', '#F97316', '#22C55E', '#3B82F6', '#A855F7', '#FFFFFF'];
+const SKETCH_SIZES = [2, 4, 7, 12];
+
+function SketchPad({
+  element, theme, zoom = 1, onUpdate,
+}: {
+  element: CanvasElement;
+  theme: 'light' | 'dark';
+  zoom?: number;
+  onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
+}) {
+  const strokes: Stroke[] = element.content.strokes || [];
+  const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
+  const [color, setColor] = useState('#0F172A');
+  const [size, setSize] = useState(4);
+  const [current, setCurrent] = useState<Stroke | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dark = theme === 'dark';
+
+  const localPoint = (clientX: number, clientY: number): number[] => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return [0, 0];
+    return [(clientX - rect.left) / zoom, (clientY - rect.top) / zoom];
+  };
+
+  const commitStrokes = (next: Stroke[]) => {
+    onUpdate(element.id, { content: { ...element.content, strokes: next } });
+  };
+
+  const eraseAt = (pt: number[]) => {
+    const threshold = Math.max(14, size + 8);
+    const next = strokes.filter(s => !s.points.some(p => Math.hypot(p[0] - pt[0], p[1] - pt[1]) < threshold));
+    if (next.length !== strokes.length) commitStrokes(next);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const pt = localPoint(e.clientX, e.clientY);
+
+    if (tool === 'eraser') {
+      eraseAt(pt);
+      const move = (me: PointerEvent) => eraseAt(localPoint(me.clientX, me.clientY));
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      return;
+    }
+
+    let working: Stroke = { color, size, points: [pt] };
+    setCurrent(working);
+    const move = (me: PointerEvent) => {
+      working = { ...working, points: [...working.points, localPoint(me.clientX, me.clientY)] };
+      setCurrent(working);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (working.points.length > 1) commitStrokes([...strokes, working]);
+      setCurrent(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  const toPath = (s: Stroke) =>
+    s.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
+
+  const btn = (activeState: boolean) =>
+    `w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
+      activeState
+        ? 'bg-rose-500 text-white'
+        : dark ? 'text-zinc-400 hover:bg-zinc-700' : 'text-zinc-500 hover:bg-zinc-100'
+    }`;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Toolbar (this strip is draggable to move the card) */}
+      <div className={`flex items-center gap-1 px-1.5 py-1 mb-1.5 rounded-lg ${dark ? 'bg-zinc-800/60' : 'bg-zinc-100/80'}`}>
+        <button onClick={() => setTool('pen')} className={btn(tool === 'pen')} title="Pen"><Pencil className="w-3.5 h-3.5" /></button>
+        <button onClick={() => setTool('eraser')} className={btn(tool === 'eraser')} title="Eraser"><Eraser className="w-3.5 h-3.5" /></button>
+        <div className={`w-px h-4 mx-0.5 ${dark ? 'bg-zinc-700' : 'bg-zinc-300'}`} />
+        {/* Colors */}
+        <div className="flex items-center gap-1">
+          {SKETCH_COLORS.map(c => (
+            <button
+              key={c}
+              onClick={() => { setColor(c); setTool('pen'); }}
+              className={`w-3.5 h-3.5 rounded-full border transition-transform hover:scale-125 ${color === c && tool === 'pen' ? 'ring-2 ring-rose-500 ring-offset-1' : 'border-black/20'}`}
+              style={{ backgroundColor: c }}
+              title={c}
+            />
+          ))}
+        </div>
+        <div className={`w-px h-4 mx-0.5 ${dark ? 'bg-zinc-700' : 'bg-zinc-300'}`} />
+        {/* Sizes */}
+        <div className="flex items-center gap-1">
+          {SKETCH_SIZES.map(s => (
+            <button key={s} onClick={() => setSize(s)} className={`w-5 h-5 flex items-center justify-center rounded-md ${size === s ? (dark ? 'bg-zinc-700' : 'bg-zinc-200') : ''}`} title={`${s}px`}>
+              <span className="rounded-full bg-current block" style={{ width: Math.min(s, 10), height: Math.min(s, 10), color: dark ? '#d4d4d8' : '#3f3f46' }} />
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={() => commitStrokes(strokes.slice(0, -1))}
+            disabled={strokes.length === 0}
+            className={`${btn(false)} disabled:opacity-30`}
+            title="Undo"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => commitStrokes([])} disabled={strokes.length === 0} className={`${btn(false)} disabled:opacity-30`} title="Clear"><Trash2 className="w-3.5 h-3.5" /></button>
+        </div>
+      </div>
+
+      {/* Drawing surface */}
+      <svg
+        ref={svgRef}
+        data-no-drag="true"
+        onPointerDown={handlePointerDown}
+        className={`flex-1 w-full rounded-lg touch-none ${dark ? 'bg-zinc-900' : 'bg-white'} ${tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'}`}
+        style={{ border: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
+      >
+        {strokes.map((s, i) => (
+          <path key={i} d={toPath(s)} stroke={s.color} strokeWidth={s.size} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        ))}
+        {current && (
+          <path d={toPath(current)} stroke={current.color} strokeWidth={current.size} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        )}
+      </svg>
     </div>
   );
 }
