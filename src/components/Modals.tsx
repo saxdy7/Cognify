@@ -347,6 +347,72 @@ export function EditBookmarkModal({
   );
 }
 
+export function AddBoardModal({
+  isOpen,
+  onClose,
+  onAdd
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name) return;
+    setLoading(true);
+    try {
+      await onAdd(name);
+      setName('');
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Initialize Workspace">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="space-y-4">
+          <label className="block text-sm font-bold text-zinc-500 tracking-wide uppercase">
+            Workspace Name
+          </label>
+          <div className="relative group">
+            <div className="absolute inset-0 bg-rose-500/10 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+            <div className="relative">
+              <Presentation className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-rose-500 transition-colors" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="e.g. Product Roadmap, Moodboard, Sprint Plan"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full pl-16 pr-6 py-5 bg-zinc-100 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl text-sm font-bold placeholder:text-zinc-500 focus:border-rose-500/50 outline-none transition-all"
+              />
+            </div>
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={!name || loading}
+          className="w-full py-5 bg-gradient-to-r from-rose-500 to-rose-600 text-white rounded-[1.5rem] font-black flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all shadow-2xl"
+        >
+          {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+            <>
+              <Zap className="w-5 h-5 fill-current" />
+              Create Workspace
+            </>
+          )}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 export function AddContainerModal({
   isOpen,
   onClose,

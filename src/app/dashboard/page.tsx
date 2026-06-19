@@ -5,9 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { BookmarkCard } from '@/components/BookmarkCard';
 import { PasswordCard } from '@/components/PasswordCard';
-import { MasonryGrid } from '@/components/MasonryGrid';
-import { MicroExpander } from '@/components/MicroExpander';
-import { AddBookmarkModal, AddContainerModal, EditBookmarkModal } from '@/components/Modals';
+import { AddBookmarkModal, AddContainerModal, EditBookmarkModal, AddBoardModal } from '@/components/Modals';
 import { AddPasswordModal, EditPasswordModal } from '@/components/PasswordModals';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { TemplateGallery } from '@/components/TemplateGallery';
@@ -39,6 +37,7 @@ export default function Dashboard() {
   const [isAddPasswordOpen, setIsAddPasswordOpen] = useState(false);
   const [isEditPasswordOpen, setIsEditPasswordOpen] = useState(false);
   const [isAddContainerOpen, setIsAddContainerOpen] = useState(false);
+  const [isAddBoardOpen, setIsAddBoardOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -487,10 +486,7 @@ export default function Dashboard() {
           setSelectedBoardId(id);
           setIsMobileSidebarOpen(false);
         }}
-        onAddBoard={() => {
-          const name = prompt('Enter visual workspace name:');
-          if (name) handleAddBoard(name);
-        }}
+        onAddBoard={() => setIsAddBoardOpen(true)}
       />
 
       <main className={cn(
@@ -500,11 +496,8 @@ export default function Dashboard() {
       )}>
         <Header
           onAddBookmark={
-            viewType === 'canvas' 
-              ? () => {
-                  const name = prompt('Enter visual workspace name:');
-                  if (name) handleAddBoard(name);
-                }
+            viewType === 'canvas'
+              ? () => setIsAddBoardOpen(true)
               : viewType === 'bookmarks'
                 ? () => setIsAddBookmarkOpen(true)
                 : () => setIsAddPasswordOpen(true)
@@ -718,10 +711,7 @@ export default function Dashboard() {
                     <p className="text-zinc-500 font-bold uppercase tracking-widest text-[9px] mt-1">Freeform infinite 2D canvas boards</p>
                   </div>
                   <button
-                    onClick={() => {
-                      const name = prompt('Enter workspace name:');
-                      if (name) handleAddBoard(name);
-                    }}
+                    onClick={() => setIsAddBoardOpen(true)}
                     className="px-6 py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-orange-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all shadow-[0_4px_15px_rgba(244,63,94,0.3)] shrink-0 cursor-pointer"
                   >
                     New Board
@@ -906,16 +896,6 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <MicroExpander
-        onAddBookmark={() => setIsAddBookmarkOpen(true)}
-        onAddContainer={() => setIsAddContainerOpen(true)}
-        onSearch={() => {
-          const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-          input?.focus();
-        }}
-        onToggleFavorites={() => setSelectedContainerId(selectedContainerId === 'favorites' ? null : 'favorites')}
-      />
-
       <AddBookmarkModal
         isOpen={isAddBookmarkOpen}
         onClose={() => setIsAddBookmarkOpen(false)}
@@ -935,6 +915,12 @@ export default function Dashboard() {
         isOpen={isAddContainerOpen}
         onClose={() => setIsAddContainerOpen(false)}
         onAdd={handleAddContainer}
+      />
+
+      <AddBoardModal
+        isOpen={isAddBoardOpen}
+        onClose={() => setIsAddBoardOpen(false)}
+        onAdd={handleAddBoard}
       />
 
       <AddPasswordModal
