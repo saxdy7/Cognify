@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Tldraw, createShapeId, getSnapshot, loadSnapshot } from 'tldraw';
-import 'tldraw/tldraw.css';
 import { ArrowLeft, Moon, Sun, CloudLightning, Loader2, Maximize, Minimize } from 'lucide-react';
 import { CanvasBoard } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -453,7 +452,7 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
       </div>
 
       {/* Tldraw infinite canvas mount */}
-      <div className="flex-1 w-full h-full relative">
+      <div className="flex-1 w-full relative min-h-0">
         <Tldraw
           onMount={handleMount}
           autoFocus={true}
