@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Tldraw, createShapeId } from 'tldraw';
+import { Tldraw, createShapeId, getSnapshot, loadSnapshot } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { ArrowLeft, Moon, Sun, CloudLightning, Loader2, Maximize, Minimize } from 'lucide-react';
 import { CanvasBoard } from '@/types';
@@ -249,7 +249,7 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
         initializeTemplate(editorInstance, initialSnapshot.templateId);
       } else {
         try {
-          editorInstance.store.loadSnapshot(initialSnapshot);
+          loadSnapshot(editorInstance.store, initialSnapshot);
         } catch (e) {
           console.warn("Could not load full snapshot, falling back to schema defaults.", e);
         }
@@ -275,7 +275,7 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
     const saveStore = async () => {
       setSavingStatus('saving');
       try {
-        const snapshot = editor.store.getSnapshot();
+        const snapshot = getSnapshot(editor.store);
         const { error } = await supabase
           .from('canvas_boards')
           .update({ 
