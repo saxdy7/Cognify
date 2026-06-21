@@ -187,3 +187,45 @@ li {
 .cssbuttons-io-button:active .icon {
   transform: scale(0.95);
 }
+/* ─────────────────────────── Cognify Docs editor (TipTap) ─────────────────────────── */
+.cognify-prose {
+  color: #d4d4d8; /* zinc-300 */
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.cognify-prose > * + * { margin-top: 0.85rem; }
+.cognify-prose h1 { font-size: 1.875rem; font-weight: 800; color: #fff; line-height: 1.2; margin-top: 1.75rem; letter-spacing: -0.02em; }
+.cognify-prose h2 { font-size: 1.5rem; font-weight: 800; color: #fff; line-height: 1.25; margin-top: 1.5rem; letter-spacing: -0.02em; }
+.cognify-prose h3 { font-size: 1.25rem; font-weight: 700; color: #fff; line-height: 1.3; margin-top: 1.25rem; }
+.cognify-prose p { color: #d4d4d8; }
+.cognify-prose strong { color: #fff; font-weight: 700; }
+.cognify-prose a { color: #34d399; text-decoration: underline; }
+.cognify-prose ul { list-style: disc; padding-left: 1.5rem; }
+.cognify-prose ol { list-style: decimal; padding-left: 1.5rem; }
+.cognify-prose li { margin: 0.25rem 0; }
+.cognify-prose li > p { margin: 0; }
+.cognify-prose blockquote { border-left: 3px solid #10b981; padding-left: 1rem; color: #a1a1aa; font-style: italic; }
+.cognify-prose code { background: rgba(255,255,255,0.08); color: #fcd34d; padding: 0.15em 0.4em; border-radius: 0.35rem; font-size: 0.875em; }
+.cognify-prose pre { background: #0a0a0a; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.85rem; padding: 1rem 1.25rem; overflow-x: auto; }
+.cognify-prose pre code { background: transparent; color: #e4e4e7; padding: 0; font-size: 0.875rem; }
+.cognify-prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 1.5rem 0; }
+
+/* Task list (to-dos) */
+.cognify-prose ul[data-type="taskList"] { list-style: none; padding-left: 0.25rem; }
+.cognify-prose ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.6rem; }
+.cognify-prose ul[data-type="taskList"] li > label { margin-top: 0.35rem; user-select: none; }
+.cognify-prose ul[data-type="taskList"] li > div { flex: 1 1 auto; }
+.cognify-prose ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: #10b981; width: 1rem; height: 1rem; cursor: pointer;
+}
+.cognify-prose ul[data-type="taskList"] li[data-checked="true"] > div { color: #71717a; text-decoration: line-through; }
+
+/* Placeholder (empty editor) */
+.cognify-prose p.is-editor-empty:first-child::before,
+.cognify-prose .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #52525b;
+  pointer-events: none;
+  height: 0;
+}

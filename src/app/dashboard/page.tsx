@@ -9,8 +9,9 @@ import { AddBookmarkModal, AddContainerModal, EditBookmarkModal, AddBoardModal }
 import { AddPasswordModal, EditPasswordModal } from '@/components/PasswordModals';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { TemplateGallery } from '@/components/TemplateGallery';
+import { DocsWorkspace } from '@/components/DocsWorkspace';
 import { supabase } from '@/lib/supabase';
-import { Bookmark, Container, Notification, Password, CanvasBoard } from '@/types';
+import { Bookmark, Container, Notification, Password, CanvasBoard, Note } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Plus, Sparkles, Settings, LogOut, Bell, CheckCircle, Info, AlertTriangle, ArrowRight, LayoutGrid, List, X, Presentation, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -22,14 +23,16 @@ export default function Dashboard() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [passwords, setPasswords] = useState<Password[]>([]);
   const [boards, setBoards] = useState<CanvasBoard[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<any>(null);
   const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
   const [selectedPassword, setSelectedPassword] = useState<Password | null>(null);
-  const [viewType, setViewType] = useState<'bookmarks' | 'passwords' | 'canvas'>('bookmarks');
+  const [viewType, setViewType] = useState<'bookmarks' | 'passwords' | 'canvas' | 'docs'>('bookmarks');
   const router = useRouter();
 
   const [isAddBookmarkOpen, setIsAddBookmarkOpen] = useState(false);
@@ -128,10 +131,22 @@ export default function Dashboard() {
         toast.error('Failed to load visual boards: ' + boardsError.message);
       }
 
+      const { data: notesData, error: notesError } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (notesError) {
+        console.error('Error fetching notes:', notesError);
+        toast.error('Failed to load docs: ' + notesError.message);
+      }
+
       setContainers(containersData || []);
       setBookmarks(bookmarksData || []);
       setPasswords(passwordsData || []);
       setBoards(boardsData || []);
+      setNotes(notesData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
@@ -176,6 +191,96 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error deleting board:', error);
       toast.error('Failed to purge board');
+    }
+  };
+
+  // Docs / Pages Handlers
+  const seedDatabaseContent = () => ({
+    kind: 'database',
+    columns: [
+      { id: 'c_name', name: 'Name', type: 'text' },
+      { id: 'c_done', name: 'Done', type: 'checkbox' },
+      { id: 'c_link', name: 'Link', type: 'url' },
+      { id: 'c_phone', name: 'Number', type: 'text' },
+      { id: 'c_status', name: 'Status', type: 'select', options: [
+        { id: 's1', name: 'Not started', color: 'gray' },
+        { id: 's2', name: 'In progress', color: 'blue' },
+        { id: 's3', name: 'Done', color: 'green' },
+      ] },
+    ],
+    rows: [
+      { id: 'r1', cells: { c_name: '', c_done: false, c_link: '', c_phone: '', c_status: null } },
+      { id: 'r2', cells: { c_name: '', c_done: false, c_link: '', c_phone: '', c_status: null } },
+      { id: 'r3', cells: { c_name: '', c_done: false, c_link: '', c_phone: '', c_status: null } },
+    ],
+  });
+
+  const handleAddNote = async (parentId: string | null = null, kind: 'page' | 'database' = 'page') => {
+    if (!user) return;
+    try {
+      const isDb = kind === 'database';
+      const { data, error } = await supabase
+        .from('notes')
+        .insert([{
+          user_id: user.id,
+          parent_id: parentId,
+          title: isDb ? 'Untitled Database' : 'Untitled',
+          icon: isDb ? '🗃️' : '📄',
+          content: isDb ? seedDatabaseContent() : {},
+        }])
+        .select();
+
+      if (error) throw error;
+      if (data) {
+        setNotes([data[0], ...notes]);
+        setSelectedNoteId(data[0].id);
+        toast.success(isDb ? 'Database created' : 'Page created');
+        addNotification(isDb ? 'Database Created' : 'Page Created', `A new ${isDb ? 'database' : 'doc page'} has been added to your workspace.`, 'success');
+      }
+    } catch (error) {
+      console.error('Error adding note:', error);
+      toast.error('Failed to create page');
+    }
+  };
+
+  const handleUpdateNote = async (id: string, updatedData: Partial<Note>) => {
+    // Optimistic update
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updatedData } : n));
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .update({ ...updatedData, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating note:', error);
+      toast.error('Failed to save page');
+    }
+  };
+
+  const handleDeleteNote = async (id: string) => {
+    try {
+      // Cascade is handled by the DB (ON DELETE CASCADE), mirror it locally
+      const toRemove = new Set<string>([id]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const n of notes) {
+          if (n.parent_id && toRemove.has(n.parent_id) && !toRemove.has(n.id)) {
+            toRemove.add(n.id);
+            grew = true;
+          }
+        }
+      }
+      const { error } = await supabase.from('notes').delete().eq('id', id);
+      if (error) throw error;
+      setNotes(notes.filter(n => !toRemove.has(n.id)));
+      if (selectedNoteId && toRemove.has(selectedNoteId)) setSelectedNoteId(null);
+      toast.success('Page deleted');
+      addNotification('Page Deleted', 'A doc page and its subpages were removed.', 'warning');
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast.error('Failed to delete page');
     }
   };
 
@@ -446,6 +551,15 @@ export default function Dashboard() {
       if (selectedContainerId === 'settings') return 'System Settings';
       return 'Password Vault';
     }
+
+    if (viewType === 'docs') {
+      if (selectedContainerId === 'notifications') return 'Notifications';
+      if (selectedContainerId === 'settings') return 'System Settings';
+      if (selectedNoteId === 'favorites') return 'Favorite Pages';
+      if (selectedNoteId === 'recent') return 'Recently Edited';
+      if (selectedNoteId) return notes.find(n => n.id === selectedNoteId)?.title || 'Untitled';
+      return 'Knowledge Docs';
+    }
     
     if (selectedContainerId === 'favorites') return 'Curated Collection';
     if (selectedContainerId === 'today') return 'Captured Today';
@@ -488,6 +602,13 @@ export default function Dashboard() {
           setIsMobileSidebarOpen(false);
         }}
         onAddBoard={() => setIsAddBoardOpen(true)}
+        notes={notes}
+        selectedNoteId={selectedNoteId}
+        onSelectNote={(id) => {
+          setSelectedNoteId(id);
+          setIsMobileSidebarOpen(false);
+        }}
+        onAddNote={() => handleAddNote(null)}
       />
 
       <main className={cn(
@@ -499,9 +620,11 @@ export default function Dashboard() {
           onAddBookmark={
             viewType === 'canvas'
               ? () => setIsAddBoardOpen(true)
-              : viewType === 'bookmarks'
-                ? () => setIsAddBookmarkOpen(true)
-                : () => setIsAddPasswordOpen(true)
+              : viewType === 'docs'
+                ? () => handleAddNote(null)
+                : viewType === 'bookmarks'
+                  ? () => setIsAddBookmarkOpen(true)
+                  : () => setIsAddPasswordOpen(true)
           }
           onProfileClick={() => setSelectedContainerId('settings')}
           onNotificationsClick={() => setSelectedContainerId('notifications')}
@@ -515,12 +638,13 @@ export default function Dashboard() {
             // Reset selection so the destination view's navigation highlights correctly
             setSelectedContainerId(null);
             setSelectedBoardId(null);
+            setSelectedNoteId(null);
           }}
         />
 
         <div className="flex-1 p-4 sm:p-6 md:p-8 lg:p-12 overflow-y-auto custom-scrollbar">
           {/* View Toggle & Content Header */}
-          {selectedContainerId !== 'settings' && selectedContainerId !== 'notifications' && viewType !== 'canvas' && (
+          {selectedContainerId !== 'settings' && selectedContainerId !== 'notifications' && viewType !== 'canvas' && viewType !== 'docs' && (
             <div className="flex items-center justify-end mb-4 sm:mb-6 md:mb-8 gap-2">
               <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-xl">
                 <button
@@ -782,6 +906,16 @@ export default function Dashboard() {
                 </div>
               </div>
             )
+          ) : viewType === 'docs' ? (
+            <DocsWorkspace
+              notes={notes}
+              selectedNoteId={selectedNoteId}
+              searchQuery={searchQuery}
+              onSelectNote={setSelectedNoteId}
+              onAddNote={handleAddNote}
+              onUpdateNote={handleUpdateNote}
+              onDeleteNote={handleDeleteNote}
+            />
           ) : viewType === 'passwords' ? (
             // Password View
             filteredPasswords.length > 0 ? (

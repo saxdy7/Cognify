@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, Plus, Bell, User, Sparkles, Command, ShieldCheck, Zap, Menu, Bookmark, Key, Layers } from 'lucide-react';
+import { Search, Plus, Bell, User, Sparkles, Command, ShieldCheck, Zap, Menu, Bookmark, Key, Layers, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -13,8 +13,8 @@ interface HeaderProps {
   onSearchChange: (query: string) => void;
   containerName?: string;
   onMenuClick?: () => void;
-  viewType?: 'bookmarks' | 'passwords' | 'canvas';
-  onViewTypeChange?: (type: 'bookmarks' | 'passwords' | 'canvas') => void;
+  viewType?: 'bookmarks' | 'passwords' | 'canvas' | 'docs';
+  onViewTypeChange?: (type: 'bookmarks' | 'passwords' | 'canvas' | 'docs') => void;
 }
 
 export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, searchQuery, onSearchChange, containerName = 'All Bookmarks', onMenuClick, viewType = 'bookmarks', onViewTypeChange }: HeaderProps) {
@@ -60,13 +60,25 @@ export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, se
               onClick={() => onViewTypeChange('canvas')}
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all",
-                viewType === 'canvas' 
-                  ? "bg-rose-500 text-white shadow-lg" 
+                viewType === 'canvas'
+                  ? "bg-rose-500 text-white shadow-lg"
                   : "text-zinc-400 hover:text-white hover:bg-white/5"
               )}
             >
               <Layers className="w-4 h-4" />
               <span className="hidden xl:inline">Canvas</span>
+            </button>
+            <button
+              onClick={() => onViewTypeChange('docs')}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all",
+                viewType === 'docs'
+                  ? "bg-emerald-500 text-white shadow-lg"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <FileText className="w-4 h-4" />
+              <span className="hidden xl:inline">Docs</span>
             </button>
           </div>
         )}
@@ -112,9 +124,9 @@ export function Header({ onAddBookmark, onProfileClick, onNotificationsClick, se
           whileTap={{ scale: 0.95 }}
           onClick={onAddBookmark}
           className="hidden xl:flex items-center gap-3 px-6 lg:px-8 py-4 lg:py-5 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] lg:rounded-[1.75rem] text-sm font-black shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_40px_-10px_rgba(255,255,255,0.1)] transition-all">
-          {viewType === 'canvas' ? <Plus className="w-4 h-4" /> : viewType === 'passwords' ? <Plus className="w-4 h-4" /> : <Zap className="w-4 h-4 fill-current" />}
+          {viewType === 'bookmarks' ? <Zap className="w-4 h-4 fill-current" /> : <Plus className="w-4 h-4" />}
           <span className="hidden 2xl:inline">
-            {viewType === 'canvas' ? 'New Board' : viewType === 'passwords' ? 'Add Password' : 'Capture Link'}
+            {viewType === 'canvas' ? 'New Board' : viewType === 'passwords' ? 'Add Password' : viewType === 'docs' ? 'New Page' : 'Capture Link'}
           </span>
         </motion.button>
 

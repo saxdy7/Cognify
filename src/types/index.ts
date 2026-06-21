@@ -74,6 +74,18 @@ export interface CanvasElement {
   updated_at: string;
 }
 
+export interface Note {
+  id: string;
+  user_id: string;
+  parent_id?: string | null;
+  icon?: string;
+  title: string;
+  content: any; // TipTap document JSON
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CanvasConnector {
   id: string;
   board_id: string;
