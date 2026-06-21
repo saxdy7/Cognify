@@ -7,7 +7,9 @@
       "Bash(rmdir scripts *)",
       "mcp__claude_ai_Vercel__list_teams",
       "mcp__claude_ai_Vercel__list_projects",
-      "mcp__claude_ai_Vercel__get_runtime_logs"
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "Bash(npx --no-install vercel whoami)",
+      "Bash(grep -vi \"telemetry\\\\|NOTE\\\\|learn more\\\\|vercel.com/docs\\\\|^$\")"
     ]
   }
 }
