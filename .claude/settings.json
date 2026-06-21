@@ -4,7 +4,9 @@
       "Bash(node -e \"try{require.resolve\\('pg'\\);console.log\\('pg ready'\\)}catch\\(e\\){console.log\\('still missing'\\)}\")",
       "Bash(timeout 90 node scripts/run-notes-migration.mjs)",
       "Bash(rm -f scripts/run-notes-migration.mjs)",
-      "Bash(rmdir scripts *)"
+      "Bash(rmdir scripts *)",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_projects"
     ]
   }
 }
