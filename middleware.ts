@@ -8,10 +8,18 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Fail open: if env vars are missing, never 500 the whole site — let the
+  // request through and let the client-side handle auth. (Routes are still
+  // protected once env vars are configured.)
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return response
+  }
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -28,22 +36,26 @@ export async function middleware(request: NextRequest) {
           )
         },
       },
+    })
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Protect dashboard routes
+    if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+      return NextResponse.redirect(new URL('/login', request.url))
     }
-  )
 
-  const { data: { user } } = await supabase.auth.getUser()
+    // Redirect to dashboard if logged in and trying to access login/landing (optional)
+    if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
 
-  // Protect dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return response
+  } catch (e) {
+    // Any auth/runtime failure in middleware must not take the site down.
+    console.error('middleware auth error:', e)
+    return response
   }
-
-  // Redirect to dashboard if logged in and trying to access login/landing (optional)
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
-  return response
 }
 
 export const config = {
