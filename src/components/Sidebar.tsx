@@ -2,9 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Folder, Plus, LayoutDashboard, Star, Hash, Settings, ChevronRight, Sparkles, Zap, Command, PanelLeftClose, PanelLeftOpen, Layers, Users, Trash, Award, Home, Presentation } from 'lucide-react';
+import { Folder, Plus, LayoutDashboard, Star, Hash, Settings, ChevronRight, Sparkles, Zap, Command, PanelLeftClose, PanelLeftOpen, Layers, Users, Trash, Award, Home, Presentation, KeyRound, Clock, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Container, CanvasBoard } from '@/types';
+import { Container, CanvasBoard, Password } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SidebarProps {
@@ -22,6 +22,7 @@ interface SidebarProps {
   selectedBoardId?: string | null;
   onSelectBoard?: (id: string | null) => void;
   onAddBoard?: () => void;
+  passwords?: Password[];
 }
 
 // Helper component for animated text
@@ -51,8 +52,29 @@ export function Sidebar({
   boards = [],
   selectedBoardId = null,
   onSelectBoard,
-  onAddBoard
+  onAddBoard,
+  passwords = []
 }: SidebarProps) {
+  // Mirror the strength buckets used by PasswordCard so the vault summary stays consistent.
+  const passwordStrength = (pwd: string) => {
+    let s = 0;
+    if (pwd.length >= 8) s++;
+    if (pwd.length >= 12) s++;
+    if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) s++;
+    if (/\d/.test(pwd)) s++;
+    if (/[^a-zA-Z0-9]/.test(pwd)) s++;
+    if (s <= 2) return 'weak';
+    if (s <= 3) return 'medium';
+    return 'strong';
+  };
+  const vault = {
+    total: passwords.length,
+    strong: passwords.filter(p => passwordStrength(p.password) === 'strong').length,
+    medium: passwords.filter(p => passwordStrength(p.password) === 'medium').length,
+    weak: passwords.filter(p => passwordStrength(p.password) === 'weak').length,
+    favorites: passwords.filter(p => p.is_favorite).length,
+  };
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -187,8 +209,60 @@ export function Sidebar({
                 </AnimatePresence>
               </button>
             </>
+          ) : viewType === 'passwords' ? (
+            // Password Vault navigation
+            <>
+              <button
+                onClick={() => onSelectContainer(null)}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-black transition-all duration-300 group",
+                  selectedContainerId === null && !isFavorites
+                    ? "bg-white text-black shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
+                    : "text-zinc-500 hover:text-white hover:bg-white/5",
+                  isCollapsed && "justify-center px-0 py-4"
+                )}
+                title={isCollapsed ? "All Passwords" : undefined}
+              >
+                <KeyRound className={cn("w-5 h-5 shrink-0", selectedContainerId === null && !isFavorites ? "text-indigo-500" : "text-zinc-500")} />
+                <AnimatePresence>
+                  {!isCollapsed && <SidebarText>All Passwords</SidebarText>}
+                </AnimatePresence>
+              </button>
+              <button
+                onClick={() => onSelectContainer('favorites')}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-black transition-all duration-300 group",
+                  selectedContainerId === 'favorites'
+                    ? "bg-white text-black shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
+                    : "text-zinc-500 hover:text-white hover:bg-white/5",
+                  isCollapsed && "justify-center px-0 py-4"
+                )}
+                title={isCollapsed ? "Favorites" : undefined}
+              >
+                <Star className={cn("w-5 h-5 shrink-0", selectedContainerId === 'favorites' ? "fill-indigo-500 text-indigo-500" : "text-zinc-500")} />
+                <AnimatePresence>
+                  {!isCollapsed && <SidebarText>Favorites</SidebarText>}
+                </AnimatePresence>
+              </button>
+              <button
+                onClick={() => onSelectContainer('today')}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-black transition-all duration-300 group",
+                  selectedContainerId === 'today'
+                    ? "bg-white text-black shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
+                    : "text-zinc-500 hover:text-white hover:bg-white/5",
+                  isCollapsed && "justify-center px-0 py-4"
+                )}
+                title={isCollapsed ? "Recently Added" : undefined}
+              >
+                <Clock className={cn("w-5 h-5 shrink-0", selectedContainerId === 'today' ? "text-indigo-500" : "text-zinc-500")} />
+                <AnimatePresence>
+                  {!isCollapsed && <SidebarText>Recently Added</SidebarText>}
+                </AnimatePresence>
+              </button>
+            </>
           ) : (
-            // Default Bookmarks/Passwords navigation
+            // Bookmarks navigation
             <>
               <button
                 onClick={() => onSelectContainer(null)}
@@ -201,7 +275,7 @@ export function Sidebar({
                 )}
                 title={isCollapsed ? "Discovery" : undefined}
               >
-                <LayoutDashboard className={cn("w-5 h-5 shrink-0", selectedContainerId === null && !isFavorites ? (viewType === 'passwords' ? "text-indigo-500" : "text-orange-500") : "text-zinc-500")} />
+                <LayoutDashboard className={cn("w-5 h-5 shrink-0", selectedContainerId === null && !isFavorites ? "text-orange-500" : "text-zinc-500")} />
                 <AnimatePresence>
                   {!isCollapsed && <SidebarText>Discovery</SidebarText>}
                 </AnimatePresence>
@@ -217,7 +291,7 @@ export function Sidebar({
                 )}
                 title={isCollapsed ? "Curated" : undefined}
               >
-                <Star className={cn("w-5 h-5 shrink-0", selectedContainerId === 'favorites' ? (viewType === 'passwords' ? "fill-indigo-500 text-indigo-500" : "fill-orange-500 text-orange-500") : "text-zinc-500")} />
+                <Star className={cn("w-5 h-5 shrink-0", selectedContainerId === 'favorites' ? "fill-orange-500 text-orange-500" : "text-zinc-500")} />
                 <AnimatePresence>
                   {!isCollapsed && <SidebarText>Curated</SidebarText>}
                 </AnimatePresence>
@@ -233,7 +307,7 @@ export function Sidebar({
                 )}
                 title={isCollapsed ? "Captured Today" : undefined}
               >
-                <Zap className={cn("w-5 h-5 shrink-0", selectedContainerId === 'today' ? (viewType === 'passwords' ? "text-indigo-500" : "text-orange-500") : "text-zinc-500")} />
+                <Zap className={cn("w-5 h-5 shrink-0", selectedContainerId === 'today' ? "text-orange-500" : "text-zinc-500")} />
                 <AnimatePresence>
                   {!isCollapsed && <SidebarText>Captured Today</SidebarText>}
                 </AnimatePresence>
@@ -321,6 +395,79 @@ export function Sidebar({
                 )}
               </div>
             </>
+          ) : viewType === 'passwords' ? (
+            // Password Vault Summary Section
+            <>
+              {!isCollapsed ? (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center justify-between px-4 mb-8"
+                  >
+                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] truncate">Vault Summary</p>
+                  </motion.div>
+
+                  <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                    {/* Total */}
+                    <div className="p-5 bg-indigo-500/5 border border-indigo-500/15 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                          <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-2xl font-black text-white leading-none">{vault.total}</p>
+                          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Stored Credentials</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Strength breakdown */}
+                    <div className="p-5 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                      <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">Strength</p>
+                      {([
+                        { key: 'strong', label: 'Strong', count: vault.strong, bar: 'bg-green-500', text: 'text-green-400' },
+                        { key: 'medium', label: 'Medium', count: vault.medium, bar: 'bg-yellow-500', text: 'text-yellow-400' },
+                        { key: 'weak', label: 'Weak', count: vault.weak, bar: 'bg-red-500', text: 'text-red-400' },
+                      ]).map((row) => (
+                        <div key={row.key} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-400">{row.label}</span>
+                            <span className={cn("text-xs font-black", row.text)}>{row.count}</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div
+                              className={cn("h-full rounded-full transition-all duration-500", row.bar)}
+                              style={{ width: vault.total ? `${(row.count / vault.total) * 100}%` : '0%' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Favorites */}
+                    <button
+                      onClick={() => onSelectContainer('favorites')}
+                      className="w-full p-4 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-between hover:bg-white/[0.06] transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Star className="w-4 h-4 fill-indigo-500 text-indigo-500 shrink-0" />
+                        <span className="text-xs font-bold text-zinc-300 group-hover:text-white">Favorites</span>
+                      </div>
+                      <span className="text-xs font-black text-zinc-400">{vault.favorites}</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center gap-4 pt-2">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center" title={`${vault.total} passwords`}>
+                    <ShieldCheck className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <span className="text-xs font-black text-white">{vault.total}</span>
+                </div>
+              )}
+            </>
           ) : (
             // Spaces (Containers) Section
             <>
@@ -369,7 +516,7 @@ export function Sidebar({
                   >
                     <div className={cn(
                       "w-2 h-2 rounded-full transition-all duration-500 shrink-0",
-                      selectedContainerId === container.id ? (viewType === 'passwords' ? "bg-indigo-500 scale-125 shadow-[0_0_10px_rgba(99,102,241,0.5)]" : "bg-orange-500 scale-125 shadow-[0_0_10px_rgba(249,115,22,0.5)]") : "bg-zinc-800"
+                      selectedContainerId === container.id ? "bg-orange-500 scale-125 shadow-[0_0_10px_rgba(249,115,22,0.5)]" : "bg-zinc-800"
                     )} />
                     <AnimatePresence>
                       {!isCollapsed && (
@@ -417,7 +564,7 @@ export function Sidebar({
 
         {/* Bottom Section */}
         <div className="pt-6 border-t border-white/5 mt-auto space-y-2 w-full shrink-0">
-          {viewType !== 'canvas' && (
+          {viewType === 'bookmarks' && (
             <button
               onClick={() => onSelectContainer('shortcuts')}
               className={cn(
@@ -427,7 +574,7 @@ export function Sidebar({
               )}
               title={isCollapsed ? "Shortcuts" : undefined}
             >
-              <Command className={cn("w-5 h-5 shrink-0", selectedContainerId === 'shortcuts' ? (viewType === 'passwords' ? "text-indigo-500" : "text-orange-500") : "text-zinc-500")} />
+              <Command className={cn("w-5 h-5 shrink-0", selectedContainerId === 'shortcuts' ? "text-orange-500" : "text-zinc-500")} />
               <AnimatePresence>
                 {!isCollapsed && <SidebarText>Shortcuts</SidebarText>}
               </AnimatePresence>

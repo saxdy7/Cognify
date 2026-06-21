@@ -22,7 +22,7 @@ The application features a centralized alert system that captures all critical u
 -   **Favorites**: Star items to add them to your Curated Collection.
 
 ## 🛠 Tech Stack
--   **Framework**: Next.js 14 (App Router)
+-   **Framework**: Next.js 16 (App Router, React 19)
 -   **Styling**: Tailwind CSS + Framer Motion
 -   **Icons**: Lucide React
 -   **Backend**: Supabase (Auth + Database)

@@ -480,6 +480,7 @@ export default function Dashboard() {
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
         viewType={viewType}
+        passwords={passwords}
         boards={boards}
         selectedBoardId={selectedBoardId}
         onSelectBoard={(id) => {
@@ -509,7 +510,12 @@ export default function Dashboard() {
           containerName={selectedContainerName}
           onMenuClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           viewType={viewType}
-          onViewTypeChange={setViewType}
+          onViewTypeChange={(type) => {
+            setViewType(type);
+            // Reset selection so the destination view's navigation highlights correctly
+            setSelectedContainerId(null);
+            setSelectedBoardId(null);
+          }}
         />
 
         <div className="flex-1 p-4 sm:p-6 md:p-8 lg:p-12 overflow-y-auto custom-scrollbar">
@@ -556,7 +562,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setNotifications([])}
+                  onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
                   className="hidden sm:flex px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 bg-white/5 border border-white/5 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] md:text-xs font-black text-zinc-400 uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all shrink-0"
                 >
                   Mark all read

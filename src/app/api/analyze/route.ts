@@ -18,11 +18,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
+    // SSRF guard: only allow public http(s) targets.
+    if (validUrl.protocol !== 'http:' && validUrl.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Only http(s) URLs are allowed' }, { status: 400 });
+    }
+    if (isBlockedHost(validUrl.hostname)) {
+      return NextResponse.json({ error: 'This host is not allowed' }, { status: 400 });
+    }
+
     const { data: html } = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       timeout: 5000,
+      maxContentLength: 5 * 1024 * 1024, // cap response at 5MB
+      // Re-validate every redirect hop so a public URL can't bounce us to an internal host.
+      beforeRedirect: (options: any) => {
+        if (isBlockedHost(options.hostname || options.host)) {
+          throw new Error('Redirect to a blocked host');
+        }
+      },
     });
 
     const extraction = await extractOpenGraphAsync(html, {
@@ -73,6 +88,33 @@ export async function POST(request: Request) {
     console.error('Link analysis error:', error);
     return NextResponse.json({ error: 'Failed to analyze link' }, { status: 500 });
   }
+}
+
+// Block requests to loopback, private, link-local, and other non-public hosts (SSRF defense).
+function isBlockedHost(hostname: string): boolean {
+  if (!hostname) return true;
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, ''); // strip IPv6 brackets
+
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (host === '0.0.0.0' || host === '::1' || host === '::') return true;
+
+  // IPv4 literal ranges
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    if (a === 10) return true;                          // 10.0.0.0/8
+    if (a === 127) return true;                         // loopback
+    if (a === 0) return true;                           // 0.0.0.0/8
+    if (a === 169 && b === 254) return true;            // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true;   // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;            // 192.168.0.0/16
+    if (a === 100 && b >= 64 && b <= 127) return true;  // carrier-grade NAT
+  }
+
+  // IPv6 private / unique-local / link-local
+  if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80')) return true;
+
+  return false;
 }
 
 function detectCategory(metadata: any): string {
