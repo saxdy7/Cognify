@@ -4,14 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { BookmarkCard } from '@/components/BookmarkCard';
-import { PasswordCard } from '@/components/PasswordCard';
 import { AddBookmarkModal, AddContainerModal, EditBookmarkModal, AddBoardModal } from '@/components/Modals';
-import { AddPasswordModal, EditPasswordModal } from '@/components/PasswordModals';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { TemplateGallery } from '@/components/TemplateGallery';
 import { DocsWorkspace } from '@/components/DocsWorkspace';
 import { supabase } from '@/lib/supabase';
-import { Bookmark, Container, Notification, Password, CanvasBoard, Note } from '@/types';
+import { Bookmark, Container, Notification, CanvasBoard, Note } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Plus, Sparkles, Settings, LogOut, Bell, CheckCircle, Info, AlertTriangle, ArrowRight, LayoutGrid, List, X, Presentation, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +19,6 @@ import { cn } from '@/lib/utils';
 export default function Dashboard() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [passwords, setPasswords] = useState<Password[]>([]);
   const [boards, setBoards] = useState<CanvasBoard[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,14 +28,11 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<any>(null);
   const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
-  const [selectedPassword, setSelectedPassword] = useState<Password | null>(null);
-  const [viewType, setViewType] = useState<'bookmarks' | 'passwords' | 'canvas' | 'docs'>('bookmarks');
+  const [viewType, setViewType] = useState<'bookmarks' | 'canvas' | 'docs'>('bookmarks');
   const router = useRouter();
 
   const [isAddBookmarkOpen, setIsAddBookmarkOpen] = useState(false);
   const [isEditBookmarkOpen, setIsEditBookmarkOpen] = useState(false);
-  const [isAddPasswordOpen, setIsAddPasswordOpen] = useState(false);
-  const [isEditPasswordOpen, setIsEditPasswordOpen] = useState(false);
   const [isAddContainerOpen, setIsAddContainerOpen] = useState(false);
   const [isAddBoardOpen, setIsAddBoardOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -109,17 +103,6 @@ export default function Dashboard() {
         console.log('Fetched bookmarks:', bookmarksData?.length || 0);
       }
 
-      const { data: passwordsData, error: passwordsError } = await supabase
-        .from('passwords')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (passwordsError) {
-        console.error('Error fetching passwords:', passwordsError);
-        toast.error('Failed to load passwords: ' + passwordsError.message);
-      }
-
       const { data: boardsData, error: boardsError } = await supabase
         .from('canvas_boards')
         .select('*')
@@ -144,7 +127,6 @@ export default function Dashboard() {
 
       setContainers(containersData || []);
       setBookmarks(bookmarksData || []);
-      setPasswords(passwordsData || []);
       setBoards(boardsData || []);
       setNotes(notesData || []);
     } catch (error) {
@@ -420,85 +402,6 @@ export default function Dashboard() {
     }
   };
 
-  // Password Management Handlers
-  const handleAddPassword = async (passwordData: any) => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('passwords')
-        .insert([{ ...passwordData, user_id: user.id, is_favorite: false }])
-        .select();
-
-      if (error) throw error;
-      if (data) {
-        setPasswords([data[0], ...passwords]);
-        toast.success('Password saved securely');
-        addNotification('Password Saved', `Successfully added password for "${passwordData.website_name}".`, 'success');
-      }
-    } catch (error) {
-      console.error('Error adding password:', error);
-      toast.error('Failed to save password');
-    }
-  };
-
-  const handleUpdatePassword = async (id: string, updatedData: any) => {
-    try {
-      const { error } = await supabase
-        .from('passwords')
-        .update({
-          website_name: updatedData.website_name,
-          website_url: updatedData.website_url,
-          email: updatedData.email,
-          password: updatedData.password,
-          notes: updatedData.notes,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-      setPasswords(passwords.map(p => p.id === id ? { ...p, ...updatedData } : p));
-      toast.success('Password updated');
-    } catch (error) {
-      console.error('Error updating password:', error);
-      toast.error('Failed to update password');
-    }
-  };
-
-  const handleTogglePasswordFavorite = async (password: Password) => {
-    try {
-      const { error } = await supabase
-        .from('passwords')
-        .update({ is_favorite: !password.is_favorite })
-        .eq('id', password.id);
-
-      if (error) throw error;
-      setPasswords(passwords.map(p =>
-        p.id === password.id ? { ...p, is_favorite: !p.is_favorite } : p
-      ));
-      toast.success(password.is_favorite ? 'Removed from favorites' : 'Added to favorites');
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-      toast.error('Failed to update favorite status');
-    }
-  };
-
-  const handleDeletePassword = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('passwords')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setPasswords(passwords.filter(p => p.id !== id));
-      toast.success('Password deleted securely');
-      addNotification('Password Deleted', 'Password has been permanently removed from vault.', 'warning');
-    } catch (error) {
-      console.error('Error deleting password:', error);
-      toast.error('Failed to delete password');
-    }
-  };
-
   const isToday = (date: string) => {
     const today = new Date();
     const d = new Date(date);
@@ -523,33 +426,12 @@ export default function Dashboard() {
     return true;
   });
 
-  const filteredPasswords = passwords.filter(p => {
-    const matchesSearch = p.website_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.website_url?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.notes?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (selectedContainerId === 'favorites') return p.is_favorite;
-    if (selectedContainerId === 'today') return isToday(p.created_at);
-    return true;
-  });
-
   const getSelectedName = () => {
     if (viewType === 'canvas') {
       if (selectedBoardId === 'shared') return 'Shared Boards';
       if (selectedBoardId === 'trash') return 'Trash / Archive';
       if (selectedBoardId) return boards.find(b => b.id === selectedBoardId)?.name || 'Canvas Board';
       return 'Visual Workspaces';
-    }
-
-    if (viewType === 'passwords') {
-      if (selectedContainerId === 'favorites') return 'Favorite Passwords';
-      if (selectedContainerId === 'today') return 'Added Today';
-      if (selectedContainerId === 'notifications') return 'Notifications';
-      if (selectedContainerId === 'settings') return 'System Settings';
-      return 'Password Vault';
     }
 
     if (viewType === 'docs') {
@@ -594,7 +476,6 @@ export default function Dashboard() {
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
         viewType={viewType}
-        passwords={passwords}
         boards={boards}
         selectedBoardId={selectedBoardId}
         onSelectBoard={(id) => {
@@ -622,9 +503,7 @@ export default function Dashboard() {
               ? () => setIsAddBoardOpen(true)
               : viewType === 'docs'
                 ? () => handleAddNote(null)
-                : viewType === 'bookmarks'
-                  ? () => setIsAddBookmarkOpen(true)
-                  : () => setIsAddPasswordOpen(true)
+                : () => setIsAddBookmarkOpen(true)
           }
           onProfileClick={() => setSelectedContainerId('settings')}
           onNotificationsClick={() => setSelectedContainerId('notifications')}
@@ -916,65 +795,6 @@ export default function Dashboard() {
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
             />
-          ) : viewType === 'passwords' ? (
-            // Password View
-            filteredPasswords.length > 0 ? (
-              <div className="max-w-[2000px] mx-auto pb-32">
-                <AnimatePresence mode="popLayout">
-                  <motion.div
-                    layout
-                    className={cn(
-                      viewMode === 'grid'
-                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6"
-                        : "flex flex-col gap-3 sm:gap-4 max-w-4xl mx-auto"
-                    )}
-                  >
-                    {filteredPasswords.map((password, index) => (
-                      <motion.div
-                        layout
-                        key={password.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={viewMode === 'grid' ? "h-full" : "w-full"}
-                      >
-                        <PasswordCard
-                          password={password}
-                          viewMode={viewMode}
-                          onEdit={(p) => {
-                            setSelectedPassword(p);
-                            setIsEditPasswordOpen(true);
-                          }}
-                          onDelete={handleDeletePassword}
-                          onToggleFavorite={handleTogglePasswordFavorite}
-                        />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto px-4">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center mb-6 sm:mb-8 shadow-2xl">
-                  <Sparkles className="w-10 h-10 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 font-space-grotesk">Vault is Empty</h2>
-                <p className="text-sm sm:text-base text-zinc-500 mb-6 sm:mb-10 leading-relaxed">
-                  {searchQuery
-                    ? "No passwords match your search criteria."
-                    : "Start securing your digital life by adding your first password."}
-                </p>
-                {!searchQuery && (
-                  <button
-                    onClick={() => setIsAddPasswordOpen(true)}
-                    className="px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl active:scale-95"
-                  >
-                    Add Password
-                  </button>
-                )}
-              </div>
-            )
           ) : filteredBookmarks.length > 0 ? (
             <div className="max-w-[2000px] mx-auto pb-32">
               <AnimatePresence mode="popLayout">
@@ -1061,19 +881,6 @@ export default function Dashboard() {
         isOpen={isAddBoardOpen}
         onClose={() => setIsAddBoardOpen(false)}
         onAdd={handleAddBoard}
-      />
-
-      <AddPasswordModal
-        isOpen={isAddPasswordOpen}
-        onClose={() => setIsAddPasswordOpen(false)}
-        onAdd={handleAddPassword}
-      />
-
-      <EditPasswordModal
-        isOpen={isEditPasswordOpen}
-        onClose={() => setIsEditPasswordOpen(false)}
-        onUpdate={handleUpdatePassword}
-        password={selectedPassword}
       />
     </div>
   );

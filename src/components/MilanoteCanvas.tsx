@@ -559,7 +559,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
       ],
       brainstorm: [
         { type: 'note', x: 450, y: 280, width: 260, height: 140, color: '#F3E8FF', content: { title: 'Core Concept', body: 'Evolving Cognify into a visual hub.' } },
-        { type: 'note', x: 130, y: 120, width: 240, height: 120, color: '#DBEAFE', content: { title: 'Feature: Passwords', body: 'Secure credential manager.' } },
+        { type: 'note', x: 130, y: 120, width: 240, height: 120, color: '#DBEAFE', content: { title: 'Feature: Docs', body: 'Block-based editor for notes and pages.' } },
         { type: 'note', x: 780, y: 120, width: 240, height: 120, color: '#FEF9C3', content: { title: 'Feature: Canvas', body: 'Visual boards with connectors.' } },
       ],
     };

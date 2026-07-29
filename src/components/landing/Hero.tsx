@@ -6,7 +6,6 @@ import { EnergyBeam } from '../ui/energy-beam';
 import { BlurText } from '../ui/blur-text';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { HyperText } from '../ui/hyper-text';
 
 export const LandingHero = () => {
   return (
@@ -53,7 +52,7 @@ export const LandingHero = () => {
           className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-2xl mx-auto mb-12 md:mb-16 leading-relaxed font-medium px-4"
         >
 
-          Stop losing inspiration in browser tabs. Cognify transforms your bookmarks into a <span className="text-orange-400 font-bold">God-level</span> knowledge hub with <span className="text-indigo-400 font-bold">AI-powered organization</span> and a <span className="text-indigo-400 font-bold">secure password vault</span> — all in one place.
+          Stop losing inspiration in browser tabs. Cognify turns your bookmarks into a single knowledge hub with <span className="text-orange-400 font-bold">AI-powered organization</span>, a <span className="text-indigo-400 font-bold">visual canvas</span>, and a place to write it all down.
         </motion.p>
 
         <motion.div
@@ -85,30 +84,6 @@ export const LandingHero = () => {
             Talk to Sales
           </button>
         </motion.div>
-
-
-        {/* Hero Stats/Social Proof */}
-        <div className="mt-16 md:mt-24 pt-8 md:pt-12 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-4xl mx-auto px-4">
-          {[
-            { label: 'Users', value: '50k+' },
-            { label: 'Bookmarks Saved', value: '2M+' },
-            { label: 'Smart Containers', value: '150k+' },
-            { label: 'AI Insights', value: '500k+' },
-          ].map((stat, index) => (
-            <div key={stat.label} className="text-center">
-              <HyperText
-                className="text-xl sm:text-2xl font-bold font-space-grotesk text-white inline-block"
-                startOnView={true}
-                animateOnHover={false}
-                duration={1000}
-                delay={index * 100}
-              >
-                {stat.value}
-              </HyperText>
-              <div className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-500 font-bold mt-1">{stat.label}</div>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );

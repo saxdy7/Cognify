@@ -166,7 +166,7 @@ li {
   box-shadow: 0.1em 0.1em 0.6em 0.2em #ea580c;
   /* orange-600 */
   right: 0.3em;
-  transition: all 0.3s;
+  transition: width 0.3s, transform 0.3s;
 }
 
 .cssbuttons-io-button:hover .icon {

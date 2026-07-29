@@ -192,11 +192,11 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
           props: { text: "Core Concept\nEvolving Cognify into a God-Level visual hub workspace.", color: 'purple' }
         },
         {
-          id: createShapeId('pwd-note'),
+          id: createShapeId('docs-note'),
           type: 'note',
           x: 150,
           y: 150,
-          props: { text: "Feature: Passwords\nSecure credential manager encryption.", color: 'blue' }
+          props: { text: "Feature: Docs\nBlock-based editor for notes and pages.", color: 'blue' }
         },
         {
           id: createShapeId('canvas-note'),

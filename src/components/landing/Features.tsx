@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Brain, Zap, Layers, Sparkles } from 'lucide-react';
+import { FileText, Zap, Layers, Sparkles } from 'lucide-react';
 import { BlurText } from '../ui/blur-text';
 
 const features = [
@@ -13,9 +13,9 @@ const features = [
     color: 'bg-orange-500',
   },
   {
-    title: 'Secure Vault',
-    description: 'Password manager with military-grade encryption and smart generation.',
-    icon: Brain,
+    title: 'Knowledge Docs',
+    description: 'Write and structure notes with a block-based editor built for deep work.',
+    icon: FileText,
     color: 'bg-indigo-500',
   },
   {
@@ -25,8 +25,8 @@ const features = [
     color: 'bg-orange-400',
   },
   {
-    title: 'God-level UI',
-    description: 'A cinematic interface designed for pure digital delight.',
+    title: 'Visual Canvas',
+    description: 'Drag bookmarks onto an infinite canvas and connect ideas spatially.',
     icon: Sparkles,
     color: 'bg-orange-500',
   },
@@ -37,15 +37,6 @@ export const LandingFeatures = () => {
     <section id="features" className="py-16 md:py-24 lg:py-32 bg-black relative overflow-hidden">
       <div className="container px-4 sm:px-6 mx-auto">
         <div className="max-w-4xl mb-24 text-center mx-auto">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20 mb-8 backdrop-blur-md"
-          >
-            <Zap className="w-4 h-4 text-orange-400" />
-            <span className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">Capabilities</span>
-          </motion.div>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}

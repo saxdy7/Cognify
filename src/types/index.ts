@@ -34,20 +34,6 @@ export interface Notification {
   read: boolean;
 }
 
-export interface Password {
-  id: string;
-  user_id: string;
-  website_name: string;
-  website_url?: string;
-  email: string;
-  password: string;
-  notes?: string;
-  category?: string;
-  is_favorite: boolean;
-  created_at: string;
-  updated_at?: string;
-}
-
 export interface CanvasBoard {
   id: string;
   user_id: string;

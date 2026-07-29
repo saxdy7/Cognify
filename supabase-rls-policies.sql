@@ -2,7 +2,6 @@
 ALTER TABLE public.bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.containers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.passwords ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist
 DROP POLICY IF EXISTS "Users can view their own bookmarks" ON public.bookmarks;
@@ -18,11 +17,6 @@ DROP POLICY IF EXISTS "Users can delete their own containers" ON public.containe
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
-
-DROP POLICY IF EXISTS "Users can view their own passwords" ON public.passwords;
-DROP POLICY IF EXISTS "Users can insert their own passwords" ON public.passwords;
-DROP POLICY IF EXISTS "Users can update their own passwords" ON public.passwords;
-DROP POLICY IF EXISTS "Users can delete their own passwords" ON public.passwords;
 
 -- Bookmarks policies
 CREATE POLICY "Users can view their own bookmarks"
@@ -84,25 +78,3 @@ CREATE POLICY "Users can update their own profile"
   FOR UPDATE
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
-
--- Passwords policies
-CREATE POLICY "Users can view their own passwords"
-  ON public.passwords
-  FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own passwords"
-  ON public.passwords
-  FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own passwords"
-  ON public.passwords
-  FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own passwords"
-  ON public.passwords
-  FOR DELETE
-  USING (auth.uid() = user_id);

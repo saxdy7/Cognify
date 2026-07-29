@@ -10,11 +10,11 @@ const testimonials = [
         name: 'Alex Rivera',
         role: 'Product Designer',
         image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop',
-        content: "Cognify completely transformed how I organize my design inspiration. The AI context categorization is genuinely god-level functioning.",
+        content: "Cognify completely transformed how I organize my design inspiration. The AI context categorization actually understands what I'm saving.",
         rating: 5
     },
     {
-        name: 'Sarah Chen',
+        name: 'Priya Nair',
         role: 'Research Scientist',
         image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop',
         content: "The neural sync feature saves me hours every week. It's not just a bookmark manager; it's a second brain that actually works.",
@@ -34,16 +34,6 @@ export const LandingTestimonials = () => {
         <section id="testimonials" className="py-16 md:py-24 lg:py-32 bg-zinc-950 relative overflow-hidden">
             <div className="container px-4 sm:px-6 mx-auto relative z-10">
                 <div className="max-w-4xl mb-20 text-center mx-auto">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20 mb-8 backdrop-blur-md"
-                    >
-                        <Star className="w-4 h-4 text-orange-400 fill-orange-400" />
-                        <span className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">Community</span>
-                    </motion.div>
-
                     <h2 className="text-4xl md:text-7xl font-black font-space-grotesk tracking-tighter mb-8 text-white leading-[0.9]">
                         <BlurText
                             text="Loved by"

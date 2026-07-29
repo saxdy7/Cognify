@@ -56,10 +56,6 @@ export const LandingFooter = () => {
           <p className="text-zinc-500 text-sm">
             © 2026 Cognify Labs. Built with passion for the digital universe.
           </p>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs font-bold text-zinc-500">All Systems Operational</span>
-          </div>
         </div>
       </div>
     </footer>

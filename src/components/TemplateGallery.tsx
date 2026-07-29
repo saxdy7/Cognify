@@ -69,7 +69,7 @@ export function TemplateGallery({ userId, onBoardCreated }: TemplateGalleryProps
       icon: <StickyNote className="w-8 h-8 text-teal-500" />,
       elements: [
         { id: 'core', type: 'note', x: 500, y: 300, width: 280, height: 140, color: '#F3E8FF', content: { title: 'Core Concept', body: 'Evolving Cognify into a God-Level visual hub workspace.' } },
-        { id: 'idea1', type: 'note', x: 150, y: 150, width: 260, height: 120, color: '#DBEAFE', content: { title: 'Feature: Passwords', body: 'Secure credential manager encryption.' } },
+        { id: 'idea1', type: 'note', x: 150, y: 150, width: 260, height: 120, color: '#DBEAFE', content: { title: 'Feature: Docs', body: 'Block-based editor for notes and pages.' } },
         { id: 'idea2', type: 'note', x: 850, y: 150, width: 260, height: 120, color: '#FEF9C3', content: { title: 'Feature: Canvas', body: 'Visual creative boards with connection lines.' } }
       ],
       connectors: [
