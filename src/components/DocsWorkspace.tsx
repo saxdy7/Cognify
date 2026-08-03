@@ -76,44 +76,42 @@ export function DocsWorkspace({
       </div>
 
       {list.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="border border-white/5 rounded-2xl bg-white/[0.015] divide-y divide-white/5 overflow-hidden">
           {list.map((note) => {
             const childCount = notes.filter((n) => n.parent_id === note.id).length;
             return (
               <div
                 key={note.id}
                 onClick={() => onSelectNote(note.id)}
-                className="group relative p-6 bg-white/5 border border-white/5 hover:border-emerald-500/30 rounded-3xl backdrop-blur-3xl cursor-pointer hover:bg-white/[0.08] transition-all flex flex-col min-h-[160px]"
+                className="group flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.04] transition-colors duration-150 cursor-pointer"
               >
-                <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-4 text-xl group-hover:scale-110 transition-transform">
-                  {note.icon || '📄'}
-                </div>
-                <h3 className="text-base font-black text-white group-hover:text-emerald-400 transition-colors line-clamp-1 mb-1">{note.title || 'Untitled'}</h3>
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-6">
-                  {childCount > 0 ? `${childCount} subpage${childCount > 1 ? 's' : ''} · ` : ''}Edited {new Date(note.updated_at).toLocaleDateString()}
+                <span className="text-lg shrink-0 w-6 text-center">{note.icon || '📄'}</span>
+                <span className="flex-1 min-w-0 flex items-baseline gap-3">
+                  <span className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors duration-150 truncate">{note.title || 'Untitled'}</span>
+                  {childCount > 0 && (
+                    <span className="text-[10px] font-bold text-zinc-600 shrink-0">{childCount} subpage{childCount > 1 ? 's' : ''}</span>
+                  )}
                 </span>
-
-                <div className="mt-auto flex items-center justify-between">
-                  <span className="text-[9px] font-black uppercase text-emerald-500 tracking-wider flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    Open Page <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onUpdateNote(note.id, { is_favorite: !note.is_favorite }); }}
-                      className="p-1.5 bg-white/5 text-zinc-500 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-all"
-                      title="Favorite"
-                    >
-                      <Star className={cn('w-4 h-4', note.is_favorite && 'fill-emerald-500 text-emerald-500')} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${note.title || 'Untitled'}" and its subpages?`)) onDeleteNote(note.id); }}
-                      className="p-1.5 bg-white/5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider shrink-0 hidden sm:block">
+                  Edited {new Date(note.updated_at).toLocaleDateString()}
+                </span>
+                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onUpdateNote(note.id, { is_favorite: !note.is_favorite }); }}
+                    className="p-1.5 text-zinc-500 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors duration-150"
+                    title="Favorite"
+                  >
+                    <Star className={cn('w-4 h-4', note.is_favorite && 'fill-emerald-500 text-emerald-500')} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${note.title || 'Untitled'}" and its subpages?`)) onDeleteNote(note.id); }}
+                    className="p-1.5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors duration-150"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-700 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all duration-150 shrink-0" />
               </div>
             );
           })}
@@ -152,11 +150,7 @@ function NotePage({
     if (next !== note.title) onUpdateNote(note.id, { title: next });
   };
 
-  const cycleIcon = () => {
-    const icons = ['📄', '📝', '📌', '💡', '🚀', '📊', '🎯', '🔖', '⭐', '🧠', '📚', '🗂️'];
-    const next = icons[(icons.indexOf(note.icon || '📄') + 1) % icons.length];
-    onUpdateNote(note.id, { icon: next });
-  };
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   return (
     <div className={cn('mx-auto pb-32', isDatabase ? 'max-w-[1400px]' : 'max-w-3xl')}>
@@ -179,9 +173,22 @@ function NotePage({
 
       {/* Title row */}
       <div className="flex items-start gap-4 mb-6">
-        <button onClick={cycleIcon} className="text-4xl sm:text-5xl leading-none hover:scale-110 transition-transform shrink-0" title="Change icon">
-          {note.icon || '📄'}
-        </button>
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setIconPickerOpen((o) => !o)}
+            className="text-4xl sm:text-5xl leading-none hover:scale-110 transition-transform duration-150"
+            title="Change icon"
+          >
+            {note.icon || '📄'}
+          </button>
+          {iconPickerOpen && (
+            <IconPicker
+              current={note.icon || '📄'}
+              onPick={(icon) => { onUpdateNote(note.id, { icon }); setIconPickerOpen(false); }}
+              onClose={() => setIconPickerOpen(false)}
+            />
+          )}
+        </div>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -256,5 +263,44 @@ function NotePage({
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────── Page icon picker (Notion-style emoji popover) ───────────────────────────
+const ICON_CHOICES = [
+  '📄', '📝', '📌', '💡', '🚀', '📊', '🎯', '🔖', '⭐', '🧠', '📚', '🗂️',
+  '✅', '📅', '🗒️', '📋', '🧩', '🔧', '🔍', '💬', '📁', '🏷️', '🧭', '🔥',
+  '🎨', '🎬', '🎧', '📷', '🗺️', '🌱', '💰', '📈', '🧪', '🧱', '🔒', '🌐',
+  '☕', '🏆', '🎓', '🛠️', '📦', '🧾', '🗓️', '🧵', '🪄', '🧊', '🛰️', '🪐',
+];
+
+function IconPicker({
+  current, onPick, onClose,
+}: {
+  current: string;
+  onPick: (icon: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute z-50 top-full left-0 mt-2 w-64 p-3 bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl animate-popover-in">
+        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1 pb-2">Page icon</p>
+        <div className="grid grid-cols-8 gap-1">
+          {ICON_CHOICES.map((icon) => (
+            <button
+              key={icon}
+              onClick={() => onPick(icon)}
+              className={cn(
+                'w-7 h-7 flex items-center justify-center rounded-lg text-lg hover:bg-white/10 transition-colors duration-150',
+                icon === current && 'bg-emerald-500/15 ring-1 ring-emerald-500/40',
+              )}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }

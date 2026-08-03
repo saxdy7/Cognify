@@ -106,7 +106,7 @@ const PASTEL_COLORS = [
   { name: 'Purple', value: '#F3E8FF', darkValue: '#3b0764' },
 ];
 
-export function CanvasCard({
+export const CanvasCard = React.memo(function CanvasCard({
   element,
   theme = 'light',
   zoom = 1,
@@ -132,10 +132,23 @@ export function CanvasCard({
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, elX: 0, elY: 0 });
   const hasDraggedRef = useRef(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const dragRafRef = useRef<number | null>(null);
+  const pendingDragPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Resize state
   const isResizingRef = useRef(false);
   const resizeStartRef = useRef({ w: 0, h: 0, x: 0, y: 0 });
+  const resizeRafRef = useRef<number | null>(null);
+  const pendingResizeRef = useRef<{ w: number; h: number } | null>(null);
+
+  // Cancel any in-flight rAF batches on unmount so a late frame never fires
+  // onDrag/onResize for an element that's already gone.
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current != null) cancelAnimationFrame(dragRafRef.current);
+      if (resizeRafRef.current != null) cancelAnimationFrame(resizeRafRef.current);
+    };
+  }, []);
 
   const isBorderless = element.type === 'text' || 
                        (element.type === 'image' && !!element.content.src) ||
@@ -174,27 +187,41 @@ export function CanvasCard({
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDraggingRef.current) return;
-      
+
       const deltaX = (moveEvent.clientX - dragStartRef.current.mouseX) / zoom;
       const deltaY = (moveEvent.clientY - dragStartRef.current.mouseY) / zoom;
-      
+
       if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
         hasDraggedRef.current = true;
       }
 
       const newX = dragStartRef.current.elX + deltaX;
       const newY = dragStartRef.current.elY + deltaY;
-      onDrag(element.id, newX, newY);
+      // Cap state updates to one per animation frame — mousemove can fire far
+      // faster than the display refresh rate on high-poll-rate mice/trackpads.
+      pendingDragPosRef.current = { x: newX, y: newY };
+      if (dragRafRef.current == null) {
+        dragRafRef.current = requestAnimationFrame(() => {
+          dragRafRef.current = null;
+          if (pendingDragPosRef.current) onDrag(element.id, pendingDragPosRef.current.x, pendingDragPosRef.current.y);
+        });
+      }
     };
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (dragRafRef.current != null) {
+        cancelAnimationFrame(dragRafRef.current);
+        dragRafRef.current = null;
+      }
 
       if (hasDraggedRef.current) {
-        onDragEnd(element.id, element.x, element.y);
+        const finalPos = pendingDragPosRef.current;
+        onDragEnd(element.id, finalPos?.x ?? element.x, finalPos?.y ?? element.y);
       }
+      pendingDragPosRef.current = null;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -218,13 +245,24 @@ export function CanvasCard({
       const deltaY = (moveEvent.clientY - resizeStartRef.current.y) / zoom;
       const newWidth = Math.max(140, resizeStartRef.current.w + deltaX);
       const newHeight = Math.max(60, resizeStartRef.current.h + deltaY);
-      onResize(element.id, newWidth, newHeight);
+      pendingResizeRef.current = { w: newWidth, h: newHeight };
+      if (resizeRafRef.current == null) {
+        resizeRafRef.current = requestAnimationFrame(() => {
+          resizeRafRef.current = null;
+          if (pendingResizeRef.current) onResize(element.id, pendingResizeRef.current.w, pendingResizeRef.current.h);
+        });
+      }
     };
 
     const handleResizeEnd = () => {
       isResizingRef.current = false;
       window.removeEventListener('mousemove', handleResizeMove);
       window.removeEventListener('mouseup', handleResizeEnd);
+      if (resizeRafRef.current != null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      pendingResizeRef.current = null;
     };
 
     window.addEventListener('mousemove', handleResizeMove);
@@ -592,7 +630,7 @@ export function CanvasCard({
               <span className="text-[9px] font-semibold text-blue-500">{progressPercent}%</span>
             </div>
             <div className={`w-full h-1 rounded-full mb-3 overflow-hidden ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
-              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+              <div className="h-full bg-blue-500 transition-[width] duration-300 ease-out" style={{ width: `${progressPercent}%` }} />
             </div>
 
             {/* Tasks list */}
@@ -713,6 +751,18 @@ export function CanvasCard({
       case 'sketch':
         return <SketchPad element={element} theme={theme} zoom={zoom} onUpdate={onUpdate} />;
 
+      case 'clock':
+        return <ClockCard element={element} theme={theme} onUpdate={onUpdate} />;
+
+      case 'countdown':
+        return <CountdownCard element={element} theme={theme} onUpdate={onUpdate} />;
+
+      case 'heatmap':
+        return <HeatmapCard element={element} theme={theme} onUpdate={onUpdate} />;
+
+      case 'gauge':
+        return <GaugeCard element={element} theme={theme} onUpdate={onUpdate} />;
+
       case 'board_link':
         return (
           <div className="flex flex-col h-full pointer-events-auto justify-center text-center">
@@ -769,7 +819,7 @@ export function CanvasCard({
 
   // Build className for card wrapper
   const wrapperClasses = [
-    'absolute select-none pointer-events-auto rounded-xl transition-shadow duration-200 group',
+    'absolute select-none pointer-events-auto rounded-xl transition-shadow duration-200 group animate-card-in',
     // Selection states
     isSelected
       ? 'ring-2 ring-blue-500 shadow-lg z-10'
@@ -800,8 +850,9 @@ export function CanvasCard({
       }}
       className={wrapperClasses}
       style={{
-        left: element.x,
-        top: element.y,
+        left: 0,
+        top: 0,
+        transform: `translate3d(${element.x}px, ${element.y}px, 0)`,
         width: element.width || 280,
         height: element.height || 180,
         backgroundColor: getCardBackground(),
@@ -885,7 +936,7 @@ export function CanvasCard({
       </div>
     </div>
   );
-}
+});
 
 // ─────────────────────────── Freehand sketch / draw pad ───────────────────────────
 type Stroke = { color: string; size: number; points: number[][] };
@@ -1021,6 +1072,203 @@ function SketchPad({
           <path d={toPath(current)} stroke={current.color} strokeWidth={current.size} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         )}
       </svg>
+    </div>
+  );
+}
+
+// ─────────────────────────── Widget cards ───────────────────────────
+interface WidgetCardProps {
+  element: CanvasElement;
+  theme: 'light' | 'dark';
+  onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
+}
+
+function WidgetLabel({ value, placeholder, dark, onChange }: { value: string; placeholder: string; dark: boolean; onChange: (v: string) => void }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`w-full bg-transparent text-center text-[10px] font-bold uppercase tracking-widest outline-none pb-2 mb-1 ${
+        dark ? 'text-zinc-500 placeholder:text-zinc-700' : 'text-zinc-400 placeholder:text-zinc-300'
+      }`}
+    />
+  );
+}
+
+// Live digital clock — no external time-zone data, just the visitor's local clock.
+function ClockCard({ element, theme, onUpdate }: WidgetCardProps) {
+  const dark = theme === 'dark';
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full items-center justify-center pointer-events-auto" data-no-drag="true">
+      <WidgetLabel
+        value={element.content.label || ''}
+        placeholder="Local Time"
+        dark={dark}
+        onChange={(v) => onUpdate(element.id, { content: { ...element.content, label: v } })}
+      />
+      <div className={`text-3xl font-black font-mono tabular-nums tracking-tight ${dark ? 'text-white' : 'text-zinc-900'}`}>
+        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+      </div>
+      <div className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+        {now.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+      </div>
+    </div>
+  );
+}
+
+// Countdown to a user-chosen target date/time, ticking every second.
+function CountdownCard({ element, theme, onUpdate }: WidgetCardProps) {
+  const dark = theme === 'dark';
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const targetISO: string = element.content.targetISO || '';
+  const target = targetISO ? new Date(targetISO).getTime() : null;
+  const diff = target != null ? Math.max(0, target - now) : null;
+  const units = diff != null
+    ? [
+        ['D', Math.floor(diff / 86400000)],
+        ['H', Math.floor((diff % 86400000) / 3600000)],
+        ['M', Math.floor((diff % 3600000) / 60000)],
+        ['S', Math.floor((diff % 60000) / 1000)],
+      ] as const
+    : null;
+  const reached = diff === 0;
+
+  return (
+    <div className="flex flex-col h-full pointer-events-auto" data-no-drag="true">
+      <WidgetLabel
+        value={element.content.label || ''}
+        placeholder="Countdown title"
+        dark={dark}
+        onChange={(v) => onUpdate(element.id, { content: { ...element.content, label: v } })}
+      />
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        {reached ? (
+          <span className="text-2xl">🎉</span>
+        ) : units ? (
+          <div className="flex items-center gap-2.5">
+            {units.map(([unit, val]) => (
+              <div key={unit} className="flex flex-col items-center">
+                <div className={`text-xl font-black font-mono tabular-nums ${dark ? 'text-white' : 'text-zinc-900'}`}>
+                  {String(val).padStart(2, '0')}
+                </div>
+                <div className={`text-[8px] font-bold uppercase tracking-widest mt-0.5 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{unit}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <input
+          type="datetime-local"
+          value={targetISO ? targetISO.slice(0, 16) : ''}
+          onChange={(e) => onUpdate(element.id, { content: { ...element.content, targetISO: e.target.value ? new Date(e.target.value).toISOString() : '' } })}
+          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium outline-none ${
+            dark ? 'bg-zinc-800/80 border border-zinc-700/60 text-zinc-300' : 'bg-white border border-zinc-200 text-zinc-700'
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
+// GitHub-contribution-style activity heatmap. Click a square to cycle its
+// intensity (0-4) — a lightweight habit/activity tracker, state persisted
+// in the card's content like every other card type.
+const HEATMAP_WEEKS = 12;
+const HEATMAP_DAYS = 7;
+const HEATMAP_SHADES_DARK = ['bg-white/5', 'bg-emerald-900', 'bg-emerald-700', 'bg-emerald-500', 'bg-emerald-400'];
+const HEATMAP_SHADES_LIGHT = ['bg-zinc-100', 'bg-emerald-200', 'bg-emerald-400', 'bg-emerald-500', 'bg-emerald-600'];
+
+function HeatmapCard({ element, theme, onUpdate }: WidgetCardProps) {
+  const dark = theme === 'dark';
+  const total = HEATMAP_WEEKS * HEATMAP_DAYS;
+  const values: number[] = Array.isArray(element.content.values) && element.content.values.length === total
+    ? element.content.values
+    : Array.from({ length: total }, () => 0);
+  const shades = dark ? HEATMAP_SHADES_DARK : HEATMAP_SHADES_LIGHT;
+
+  const cycle = (i: number) => {
+    const next = [...values];
+    next[i] = (next[i] + 1) % shades.length;
+    onUpdate(element.id, { content: { ...element.content, values: next } });
+  };
+
+  return (
+    <div className="flex flex-col h-full pointer-events-auto" data-no-drag="true">
+      <WidgetLabel
+        value={element.content.label || ''}
+        placeholder="Activity"
+        dark={dark}
+        onChange={(v) => onUpdate(element.id, { content: { ...element.content, label: v } })}
+      />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="grid grid-flow-col gap-[3px]" style={{ gridTemplateRows: `repeat(${HEATMAP_DAYS}, 1fr)` }}>
+          {values.map((v, i) => (
+            <button
+              key={i}
+              onClick={() => cycle(i)}
+              className={`w-2.5 h-2.5 rounded-[2px] transition-colors duration-150 ${shades[v]}`}
+              title="Click to log activity"
+            />
+          ))}
+        </div>
+      </div>
+      <p className={`text-center text-[9px] font-bold uppercase tracking-wider mt-2 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+        Click a square to log activity
+      </p>
+    </div>
+  );
+}
+
+// Radial progress gauge (SVG stroke-dasharray ring) for any value/max metric.
+function GaugeCard({ element, theme, onUpdate }: WidgetCardProps) {
+  const dark = theme === 'dark';
+  const value: number = typeof element.content.value === 'number' ? element.content.value : 60;
+  const max: number = typeof element.content.max === 'number' && element.content.max > 0 ? element.content.max : 100;
+  const unit: string = element.content.unit ?? '%';
+  const pct = Math.min(100, Math.max(0, (value / max) * 100));
+  const r = 42;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (pct / 100) * circumference;
+
+  return (
+    <div className="flex flex-col h-full items-center justify-center gap-2 pointer-events-auto" data-no-drag="true">
+      <WidgetLabel
+        value={element.content.label || ''}
+        placeholder="Metric name"
+        dark={dark}
+        onChange={(v) => onUpdate(element.id, { content: { ...element.content, label: v } })}
+      />
+      <div className="relative w-24 h-24 shrink-0">
+        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+          <circle cx="50" cy="50" r={r} fill="none" stroke={dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'} strokeWidth="8" />
+          <circle
+            cx="50" cy="50" r={r} fill="none" stroke="#f97316" strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={circumference} strokeDashoffset={offset}
+            style={{ transition: 'stroke-dashoffset 300ms cubic-bezier(0.23, 1, 0.32, 1)' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => onUpdate(element.id, { content: { ...element.content, value: Number(e.target.value) } })}
+            className={`w-12 text-center bg-transparent text-base font-black outline-none ${dark ? 'text-white' : 'text-zinc-900'}`}
+          />
+          <span className={`text-[9px] font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>/ {max}{unit}</span>
+        </div>
+      </div>
     </div>
   );
 }

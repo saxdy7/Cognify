@@ -49,7 +49,7 @@ export interface CanvasBoard {
 export interface CanvasElement {
   id: string;
   board_id: string;
-  type: 'note' | 'image' | 'link' | 'file' | 'todo' | 'column' | 'board_link' | 'text' | 'sketch' | 'heading' | 'code';
+  type: 'note' | 'image' | 'link' | 'file' | 'todo' | 'column' | 'board_link' | 'text' | 'sketch' | 'heading' | 'code' | 'clock' | 'countdown' | 'heatmap' | 'gauge';
   x: number;
   y: number;
   width?: number;

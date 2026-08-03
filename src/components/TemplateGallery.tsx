@@ -120,7 +120,7 @@ export function TemplateGallery({ userId, onBoardCreated }: TemplateGalleryProps
         {templates.map(template => (
           <div
             key={template.id}
-            className="group flex flex-col p-6 bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 hover:border-rose-500 dark:hover:border-rose-500/50 rounded-3xl shadow-md hover:shadow-xl transition-all duration-300"
+            className="group flex flex-col p-6 bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 hover:border-rose-500 dark:hover:border-rose-500/50 rounded-3xl shadow-md hover:shadow-xl transition-[border-color,box-shadow] duration-300"
           >
             <div className="w-14 h-14 bg-zinc-50 dark:bg-black/40 border border-zinc-100 dark:border-zinc-800/50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
               {template.icon}

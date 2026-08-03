@@ -119,7 +119,7 @@ export function ConnectorLine({ connector, source, target, onDelete }: Connector
               e.stopPropagation();
               onDelete();
             }}
-            className="w-6 h-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-full border border-white/20 shadow-md transform hover:scale-110 active:scale-95 transition-all"
+            className="w-6 h-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-full border border-white/20 shadow-md transform hover:scale-110 active:scale-95 transition-[background-color,transform]"
             title="Delete Connection"
           >
             <X className="w-3.5 h-3.5" />

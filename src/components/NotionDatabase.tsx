@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
-  Plus, Trash2, Type, CheckSquare, Link2, Hash, ChevronDown, X, Check, GripVertical, Loader2,
+  Plus, Trash2, Type, CheckSquare, Link2, Hash, ChevronDown, Tag, X, Check, GripVertical, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,7 +38,7 @@ const TYPE_META: Record<ColType, { label: string; icon: React.ReactNode }> = {
   checkbox: { label: 'Checkbox', icon: <CheckSquare className="w-3.5 h-3.5" /> },
   url: { label: 'URL', icon: <Link2 className="w-3.5 h-3.5" /> },
   number: { label: 'Number', icon: <Hash className="w-3.5 h-3.5" /> },
-  select: { label: 'Select', icon: <ChevronDown className="w-3.5 h-3.5" /> },
+  select: { label: 'Select', icon: <Tag className="w-3.5 h-3.5" /> },
 };
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -60,6 +61,10 @@ export function NotionDatabase({ content, onChange }: NotionDatabaseProps) {
 
   // UI state
   const [colMenu, setColMenu] = useState<string | null>(null);
+  // Popover is portaled to <body> (see render below) — it lives inside an
+  // overflow-x-auto table wrapper otherwise, which clips it for columns near
+  // the table's edge (the same class of bug the canvas "More tools" popover had).
+  const [colMenuPos, setColMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [openSelect, setOpenSelect] = useState<string | null>(null); // `${rowId}:${colId}`
 
   const commit = useCallback((next: DatabaseContent) => {
@@ -127,7 +132,12 @@ export function NotionDatabase({ content, onChange }: NotionDatabaseProps) {
               {db.columns.map((col) => (
                 <th key={col.id} className="relative text-left font-bold text-zinc-400 border-r border-white/5 last:border-r-0 min-w-[160px]">
                   <button
-                    onClick={() => setColMenu(colMenu === col.id ? null : col.id)}
+                    onClick={(e) => {
+                      if (colMenu === col.id) { setColMenu(null); return; }
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setColMenuPos({ top: rect.bottom + 4, left: rect.left });
+                      setColMenu(col.id);
+                    }}
                     className="w-full flex items-center gap-2 px-4 py-3 hover:bg-white/5 transition-colors"
                   >
                     <span className="text-zinc-600">{TYPE_META[col.type].icon}</span>
@@ -135,14 +145,16 @@ export function NotionDatabase({ content, onChange }: NotionDatabaseProps) {
                     <ChevronDown className="w-3.5 h-3.5 ml-auto text-zinc-600 shrink-0" />
                   </button>
 
-                  {colMenu === col.id && (
+                  {colMenu === col.id && colMenuPos && createPortal(
                     <ColumnMenu
                       col={col}
+                      pos={colMenuPos}
                       onRename={(name) => updateColumn(col.id, { name })}
                       onType={(t) => changeColType(col.id, t)}
                       onDelete={() => deleteColumn(col.id)}
                       onClose={() => setColMenu(null)}
-                    />
+                    />,
+                    document.body
                   )}
                 </th>
               ))}
@@ -286,6 +298,7 @@ function SelectCell({
   onAddOption: (name: string) => SelectOption;
 }) {
   const [query, setQuery] = useState('');
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const options = col.options || [];
   const current = options.find(o => o.id === value);
   const filtered = options.filter(o => o.name.toLowerCase().includes(query.toLowerCase()));
@@ -293,7 +306,14 @@ function SelectCell({
 
   return (
     <div className="relative">
-      <button onClick={onToggle} className="w-full px-4 py-2.5 flex items-center min-h-[42px] hover:bg-white/5 transition-colors">
+      <button
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPos({ top: rect.bottom + 4, left: rect.left });
+          onToggle();
+        }}
+        className="w-full px-4 py-2.5 flex items-center min-h-[42px] hover:bg-white/5 transition-colors"
+      >
         {current ? (
           <span className={cn('px-2.5 py-0.5 rounded-md text-xs font-bold', COLORS[current.color])}>{current.name}</span>
         ) : (
@@ -301,10 +321,10 @@ function SelectCell({
         )}
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => { onClose(); setQuery(''); }} />
-          <div className="absolute z-50 top-full left-2 mt-1 w-60 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-2">
+          <div className="fixed z-50 w-60 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-2" style={{ top: pos.top, left: pos.left }}>
             <input
               autoFocus
               value={query}
@@ -338,7 +358,8 @@ function SelectCell({
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
@@ -346,9 +367,10 @@ function SelectCell({
 
 // ─────────────────────────── Column header menu ───────────────────────────
 function ColumnMenu({
-  col, onRename, onType, onDelete, onClose,
+  col, pos, onRename, onType, onDelete, onClose,
 }: {
   col: Column;
+  pos: { top: number; left: number };
   onRename: (name: string) => void;
   onType: (t: ColType) => void;
   onDelete: () => void;
@@ -358,7 +380,11 @@ function ColumnMenu({
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={() => { onRename(name.trim() || 'Untitled'); onClose(); }} />
-      <div className="absolute z-50 top-full left-2 mt-1 w-60 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-2" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="fixed z-50 w-60 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-2"
+        style={{ top: pos.top, left: pos.left }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <input
           autoFocus
           value={name}

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft, Moon, Sun, Loader2, Maximize, Minimize, Plus, Minus,
   StickyNote, Link as LinkIcon, CheckSquare, Spline, LayoutGrid, Columns,
   MessageSquare, MoreHorizontal, Image as ImageIcon, Upload, Trash2,
   MousePointer2, Type, Video, FileText, Frame, Pencil, Code2,
+  Clock, Timer, Grid3x3, Gauge,
 } from 'lucide-react';
 import { CanvasBoard, CanvasElement, CanvasConnector } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -36,6 +38,10 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; color: s
   sketch: { width: 360, height: 300, color: '#FFFFFF', content: { strokes: [] } },
   heading: { width: 320, height: 72, color: '#FFFFFF', content: { text: '' } },
   code: { width: 320, height: 220, color: '#FFFFFF', content: { code: '' } },
+  clock: { width: 240, height: 190, color: '#FFFFFF', content: { label: 'Local Time' } },
+  countdown: { width: 260, height: 180, color: '#FFFFFF', content: { label: 'Countdown', targetISO: '' } },
+  heatmap: { width: 340, height: 210, color: '#FFFFFF', content: { label: 'Activity', values: [] } },
+  gauge: { width: 220, height: 270, color: '#FFFFFF', content: { label: 'Metric', value: 60, max: 100, unit: '%' } },
 };
 
 interface ToolbarItem {
@@ -65,6 +71,10 @@ const MORE_TOOLS: ToolbarItem[] = [
   { key: 'document', label: 'Document', icon: <FileText className="w-4 h-4" />, type: 'file' },
   { key: 'code', label: 'Code', icon: <Code2 className="w-4 h-4" />, type: 'code' },
   { key: 'frame', label: 'Frame', icon: <Frame className="w-4 h-4" />, type: 'column' },
+  { key: 'clock', label: 'Clock', icon: <Clock className="w-4 h-4" />, type: 'clock' },
+  { key: 'countdown', label: 'Countdown', icon: <Timer className="w-4 h-4" />, type: 'countdown' },
+  { key: 'heatmap', label: 'Activity', icon: <Grid3x3 className="w-4 h-4" />, type: 'heatmap' },
+  { key: 'gauge', label: 'Gauge', icon: <Gauge className="w-4 h-4" />, type: 'gauge' },
 ];
 
 const BOTTOM_TOOLS: ToolbarItem[] = [
@@ -82,6 +92,11 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
+  // The "More tools" popover is portaled to <body> (see render below) so it
+  // isn't clipped by the toolbar's overflow-y-auto — CSS forces overflow-x
+  // to clip too whenever overflow-y isn't visible, which was cutting it off.
+  const [morePos, setMorePos] = useState<{ top: number; left: number } | null>(null);
+  const moreButtonWrapRef = useRef<HTMLDivElement>(null);
 
   // Viewport (pan + zoom)
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -99,6 +114,17 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
+
+  // Brief eased transition for button-triggered zoom only — wheel-zoom and
+  // panning stay 1:1 with the input device, a transition there would lag.
+  const [smoothZoom, setSmoothZoom] = useState(false);
+  const smoothZoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerSmoothZoom = useCallback(() => {
+    setSmoothZoom(true);
+    if (smoothZoomTimeoutRef.current) clearTimeout(smoothZoomTimeoutRef.current);
+    smoothZoomTimeoutRef.current = setTimeout(() => setSmoothZoom(false), 220);
+  }, []);
+  useEffect(() => () => { if (smoothZoomTimeoutRef.current) clearTimeout(smoothZoomTimeoutRef.current); }, []);
 
   // Keep latest elements/connectors accessible inside async + event handlers
   const elementsRef = useRef<CanvasElement[]>([]);
@@ -463,6 +489,30 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
     setSelectedId(id);
   }, [activeTool, connectSourceId, handleDelete, createConnector]);
 
+  // Keyboard shortcuts: Delete/Backspace removes the selected card,
+  // Escape clears selection and drops back to the select tool.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+      const editing = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (editing) return;
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        e.preventDefault();
+        handleDelete(selectedId);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        setConnectSourceId(null);
+        setShowMore(false);
+        setActiveTool('select');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedId, handleDelete]);
+
   // ─────────────────────────── Pan & Zoom ───────────────────────────
   const handleSurfaceMouseDown = useCallback((e: React.MouseEvent) => {
     // Ignore clicks that originate inside a card
@@ -515,11 +565,12 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
     const newZoom = Math.min(3, Math.max(0.2, zoom * factor));
     const worldX = (cx - pan.x) / zoom;
     const worldY = (cy - pan.y) / zoom;
+    triggerSmoothZoom();
     setPan({ x: cx - worldX * newZoom, y: cy - worldY * newZoom });
     setZoom(newZoom);
   };
 
-  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  const resetView = () => { triggerSmoothZoom(); setZoom(1); setPan({ x: 0, y: 0 }); };
 
   // ─────────────────────────── Toolbar handler ───────────────────────────
   const handleToolClick = (item: ToolbarItem) => {
@@ -603,7 +654,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToBoards}
-            className={`flex items-center gap-2 px-3.5 py-1.5 border rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`}
+            className={`flex items-center gap-2 px-3.5 py-1.5 border rounded-xl text-xs font-black uppercase tracking-wider transition-[background-color,transform] active:scale-95 cursor-pointer ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`}
           >
             <ArrowLeft className="w-3.5 h-3.5 text-rose-500" />
             <span>Catalog</span>
@@ -624,10 +675,10 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
             <button onClick={resetView} className="px-2 text-[10px] font-black tabular-nums w-12 text-center" title="Reset view">{Math.round(zoom * 100)}%</button>
             <button onClick={() => zoomBy(1.1)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors" title="Zoom in"><Plus className="w-3.5 h-3.5" /></button>
           </div>
-          <button onClick={toggleFullscreen} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-all active:scale-95 ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Fullscreen">
+          <button onClick={toggleFullscreen} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Fullscreen">
             {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={() => setTheme(dark ? 'light' : 'dark')} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-all active:scale-95 ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Toggle theme">
+          <button onClick={() => setTheme(dark ? 'light' : 'dark')} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Toggle theme">
             {dark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-blue-500" />}
           </button>
         </div>
@@ -648,13 +699,30 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
             </ToolbarButton>
           ))}
 
-          {/* More popover */}
-          <div className="relative">
-            <ToolbarButton dark={dark} active={showMore} label="More" onClick={() => setShowMore(s => !s)}>
+          {/* More popover — portaled to <body>, positioned from the button's rect */}
+          <div ref={moreButtonWrapRef} className="relative">
+            <ToolbarButton
+              dark={dark}
+              active={showMore}
+              label="More"
+              onClick={() => {
+                if (!showMore) {
+                  const rect = moreButtonWrapRef.current?.getBoundingClientRect();
+                  if (rect) setMorePos({ top: rect.top, left: rect.right + 8 });
+                }
+                setShowMore(s => !s);
+              }}
+            >
               <MoreHorizontal className="w-5 h-5" />
             </ToolbarButton>
-            {showMore && (
-              <div className={`absolute left-[64px] top-0 z-[130] grid grid-cols-2 gap-1 p-2 rounded-2xl shadow-2xl border ${dark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'}`} style={{ width: 200 }}>
+          </div>
+          {showMore && morePos && createPortal(
+            <>
+              <div className="fixed inset-0 z-[129]" onClick={() => setShowMore(false)} />
+              <div
+                className={`fixed z-[130] grid grid-cols-2 gap-1 p-2 rounded-2xl shadow-2xl border animate-popover-in ${dark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'}`}
+                style={{ top: morePos.top, left: morePos.left, width: 200 }}
+              >
                 {MORE_TOOLS.map(item => (
                   <button key={item.key} onClick={() => handleToolClick(item)}
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors ${dark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'}`}>
@@ -663,8 +731,9 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
                   </button>
                 ))}
               </div>
-            )}
-          </div>
+            </>,
+            document.body
+          )}
 
           <div className={`w-8 h-px my-1 ${dark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
           {BOTTOM_TOOLS.map(item => (
@@ -702,7 +771,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
         >
           {/* Transformed content layer */}
           <div
-            className="absolute top-0 left-0 origin-top-left"
+            className={`absolute top-0 left-0 origin-top-left ${smoothZoom ? 'transition-transform duration-200 ease-out motion-reduce:transition-none' : ''}`}
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
           >
             {/* Connectors (behind cards) */}

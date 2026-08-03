@@ -489,7 +489,7 @@ export default function Dashboard() {
           setSelectedNoteId(id);
           setIsMobileSidebarOpen(false);
         }}
-        onAddNote={() => handleAddNote(null)}
+        onAddNote={(parentId) => handleAddNote(parentId ?? null)}
       />
 
       <main className={cn(

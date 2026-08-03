@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Folder, Plus, LayoutDashboard, Star, Hash, Settings, ChevronRight, Sparkles, Zap, Command, PanelLeftClose, PanelLeftOpen, Layers, Users, Trash, Award, Home, Presentation, Clock, FileText, FileStack } from 'lucide-react';
+import { Folder, Plus, LayoutDashboard, Star, Hash, Settings, ChevronRight, Sparkles, Zap, Command, PanelLeftClose, PanelLeftOpen, Layers, Users, Trash, Award, Home, Presentation, Clock, FileText, FileStack, CornerDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Container, CanvasBoard, Note } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,7 +25,7 @@ interface SidebarProps {
   notes?: Note[];
   selectedNoteId?: string | null;
   onSelectNote?: (id: string | null) => void;
-  onAddNote?: () => void;
+  onAddNote?: (parentId?: string) => void;
 }
 
 // Helper component for animated text
@@ -40,6 +40,104 @@ const SidebarText = ({ children, className }: { children: React.ReactNode, class
     {children}
   </motion.span>
 );
+
+// Recursive docs sidebar row — a Notion-style page tree: expand/collapse
+// chevron reveals subpages inline without navigating, hover reveals a
+// quick "add subpage" action, and the row itself navigates on click.
+function NoteTreeRow({
+  note, notes, depth, selectedNoteId, onSelectNote, onAddNote, expanded, onToggleExpand, isCollapsed,
+}: {
+  note: Note;
+  notes: Note[];
+  depth: number;
+  selectedNoteId?: string | null;
+  onSelectNote?: (id: string | null) => void;
+  onAddNote?: (parentId?: string) => void;
+  expanded: Set<string>;
+  onToggleExpand: (id: string) => void;
+  isCollapsed: boolean;
+}) {
+  const children = notes.filter(n => n.parent_id === note.id);
+  const hasChildren = children.length > 0;
+  const isExpanded = expanded.has(note.id);
+  const isSelected = selectedNoteId === note.id;
+  const isTopLevel = depth === 0;
+  const indent = 10 + depth * 20;
+
+  return (
+    <div>
+      <div
+        onClick={() => onSelectNote && onSelectNote(note.id)}
+        title={isCollapsed ? note.title : undefined}
+        className={cn(
+          "w-full flex items-center gap-2 rounded-lg transition-colors duration-150 group relative cursor-pointer",
+          isTopLevel ? "text-sm font-black py-2.5" : "text-xs font-bold py-1.5",
+          isSelected ? "bg-white/10 text-white" : "text-zinc-500 hover:text-white hover:bg-white/5",
+          isCollapsed && isTopLevel ? "justify-center px-0 py-4" : "pr-2"
+        )}
+        style={isCollapsed && isTopLevel ? undefined : { paddingLeft: indent }}
+      >
+        {!isCollapsed && (
+          <button
+            onClick={(e) => { e.stopPropagation(); if (hasChildren) onToggleExpand(note.id); }}
+            className={cn(
+              "w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded transition-transform duration-150",
+              hasChildren ? "text-zinc-600 hover:text-white" : "opacity-0 pointer-events-none",
+              isExpanded && "rotate-90"
+            )}
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Icon slot: top-level pages show their emoji; nested pages show
+            nothing unless active, in which case a corner-arrow "branches"
+            off the connecting line into the label — matches a standard
+            nested-nav sidebar tree (Shopify-style). */}
+        {isTopLevel ? (
+          <span className="text-base shrink-0 leading-none w-5 text-center">{note.icon || '📄'}</span>
+        ) : (
+          <span className="w-3.5 h-3.5 shrink-0 flex items-center justify-center">
+            {isSelected && <CornerDownRight className="w-3.5 h-3.5 text-zinc-500" />}
+          </span>
+        )}
+
+        {!isCollapsed && (
+          <>
+            <span className="flex-1 text-left truncate">{note.title || 'Untitled'}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onAddNote && onAddNote(note.id); }}
+              title="Add subpage"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-600 hover:text-emerald-400 hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+      {!isCollapsed && hasChildren && isExpanded && (
+        <div className="relative">
+          {/* Connecting spine dropping from this row's icon down through its children */}
+          <div className="absolute top-0 bottom-1.5 w-px bg-white/10" style={{ left: indent + 8 }} />
+          {children.map(child => (
+            <NoteTreeRow
+              key={child.id}
+              note={child}
+              notes={notes}
+              depth={depth + 1}
+              selectedNoteId={selectedNoteId}
+              onSelectNote={onSelectNote}
+              onAddNote={onAddNote}
+              expanded={expanded}
+              onToggleExpand={onToggleExpand}
+              isCollapsed={isCollapsed}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Sidebar({
   containers,
@@ -61,6 +159,36 @@ export function Sidebar({
   onSelectNote,
   onAddNote
 }: SidebarProps) {
+  // Which page rows in the docs tree are expanded to show their subpages.
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(new Set());
+  const toggleNoteExpand = (id: string) => {
+    setExpandedNoteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Auto-reveal the selected page's ancestors so its location in the tree
+  // is always visible, even if the tree was collapsed when you navigated in.
+  useEffect(() => {
+    if (viewType !== 'docs' || !selectedNoteId) return;
+    const toExpand: string[] = [];
+    let current = notes.find(n => n.id === selectedNoteId);
+    while (current?.parent_id) {
+      toExpand.push(current.parent_id);
+      current = notes.find(n => n.id === current!.parent_id);
+    }
+    if (toExpand.length) {
+      setExpandedNoteIds(prev => {
+        const next = new Set(prev);
+        toExpand.forEach(id => next.add(id));
+        return next;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNoteId, viewType]);
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -393,7 +521,7 @@ export function Sidebar({
                 >
                   <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] truncate">Pages</p>
                   <button
-                    onClick={onAddNote}
+                    onClick={() => onAddNote && onAddNote()}
                     className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-xl hover:scale-110 active:scale-90 transition-all text-zinc-500 hover:text-emerald-500 border border-white/5 shrink-0"
                   >
                     <Plus className="w-5 h-5" />
@@ -403,7 +531,7 @@ export function Sidebar({
               {isCollapsed && (
                 <div className="flex justify-center mb-8">
                   <button
-                    onClick={onAddNote}
+                    onClick={() => onAddNote && onAddNote()}
                     className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-2xl hover:scale-110 active:scale-90 transition-all text-zinc-500 hover:text-emerald-500 border border-white/5 shrink-0"
                     title="New Page"
                   >
@@ -412,40 +540,20 @@ export function Sidebar({
                 </div>
               )}
 
-              <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar flex-1">
+              <div className="space-y-1 overflow-y-auto pr-2 custom-scrollbar flex-1">
                 {notes.filter(n => !n.parent_id).map((note) => (
-                  <motion.button
-                    layout
+                  <NoteTreeRow
                     key={note.id}
-                    onClick={() => onSelectNote && onSelectNote(note.id)}
-                    className={cn(
-                      "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-black transition-all duration-300 group relative",
-                      selectedNoteId === note.id
-                        ? "bg-white/10 text-white"
-                        : "text-zinc-500 hover:text-white hover:bg-white/5",
-                      isCollapsed && "justify-center px-0 py-4"
-                    )}
-                    title={isCollapsed ? note.title : undefined}
-                  >
-                    <span className="text-base shrink-0 leading-none w-5 text-center">{note.icon || '📄'}</span>
-                    <AnimatePresence>
-                      {!isCollapsed && (
-                        <>
-                          <SidebarText className="flex-1 text-left truncate">{note.title || 'Untitled'}</SidebarText>
-                          <motion.div
-                            initial={{ opacity: 0, width: 0 }}
-                            animate={{ opacity: 1, width: "auto" }}
-                            exit={{ opacity: 0, width: 0 }}
-                          >
-                            <ChevronRight className={cn(
-                              "w-4 h-4 transition-transform duration-300 shrink-0",
-                              selectedNoteId === note.id ? "rotate-90 opacity-100" : "opacity-0 group-hover:opacity-100 group-hover:translate-x-1"
-                            )} />
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
+                    note={note}
+                    notes={notes}
+                    depth={0}
+                    selectedNoteId={selectedNoteId}
+                    onSelectNote={onSelectNote}
+                    onAddNote={onAddNote}
+                    expanded={expandedNoteIds}
+                    onToggleExpand={toggleNoteExpand}
+                    isCollapsed={isCollapsed}
+                  />
                 ))}
 
                 {notes.filter(n => !n.parent_id).length === 0 && !isCollapsed && (
