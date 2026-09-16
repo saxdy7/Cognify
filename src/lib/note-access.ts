@@ -72,13 +72,19 @@ export async function syncNoteRoom(
   };
 
   try {
-    await liveblocks.getRoom(roomId);
     await liveblocks.updateRoom(roomId, options);
-  } catch {
+  } catch (e) {
+    if ((e as { status?: number }).status !== 404) throw e;
     // Room doesn't exist yet — `null` entries aren't valid on create.
     const initial: Record<string, RoomAccess> = {};
     for (const [id, v] of Object.entries(usersAccesses)) if (v) initial[id] = v;
-    await liveblocks.createRoom(roomId, { ...options, usersAccesses: initial });
+    try {
+      await liveblocks.createRoom(roomId, { ...options, usersAccesses: initial });
+    } catch (e2) {
+      // Concurrent first-open (e.g. React StrictMode double effect): someone else just created it.
+      if ((e2 as { status?: number }).status !== 409) throw e2;
+      await liveblocks.updateRoom(roomId, options);
+    }
   }
 
   return roomId;
