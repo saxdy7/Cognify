@@ -10,6 +10,7 @@ import {
 import { InboxNotification, InboxNotificationList } from '@liveblocks/react-ui';
 import { Bell, CheckCheck, Users } from 'lucide-react';
 import { PageHeader } from '@/modules/main/PageHeader';
+import { LiveblocksBoundary } from '@/components/LiveblocksBoundary';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,9 +20,11 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 export function InboxPage() {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 p-6 md:p-8">
-      <ClientSideSuspense fallback={<InboxSkeleton />}>
-        <InboxList />
-      </ClientSideSuspense>
+      <LiveblocksBoundary feature="Inbox">
+        <ClientSideSuspense fallback={<InboxSkeleton />}>
+          <InboxList />
+        </ClientSideSuspense>
+      </LiveblocksBoundary>
     </div>
   );
 }
@@ -103,9 +106,11 @@ function InboxSkeleton() {
 /** Small unread dot. Safe to render anywhere under LiveblocksProvider. */
 export function UnreadBadge({ className }: { className?: string }) {
   return (
-    <ClientSideSuspense fallback={null}>
-      <UnreadDot className={className} />
-    </ClientSideSuspense>
+    <LiveblocksBoundary fallback={null}>
+      <ClientSideSuspense fallback={null}>
+        <UnreadDot className={className} />
+      </ClientSideSuspense>
+    </LiveblocksBoundary>
   );
 }
 

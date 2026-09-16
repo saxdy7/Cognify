@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { RoomProvider, ClientSideSuspense } from '@liveblocks/react/suspense';
 import { Loader2 } from 'lucide-react';
+import { LiveblocksBoundary, LiveblocksUnavailable } from '@/components/LiveblocksBoundary';
 
 type RoomState = { noteId: string; roomId?: string; error?: string };
 
@@ -32,20 +33,18 @@ export function NoteRoom({ noteId, children }: { noteId: string; children: React
   }, [noteId]);
 
   if (current.error) {
-    return (
-      <div className="flex h-[300px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-center">
-        <span className="text-sm font-medium">Realtime unavailable</span>
-        <span className="max-w-sm text-xs text-muted-foreground">{current.error}</span>
-      </div>
-    );
+    // Room provisioning failed (e.g. LIVEBLOCKS_SECRET_KEY missing) — same message as the boundary
+    return <LiveblocksUnavailable feature="Collaborative editing" error={new Error(current.error)} />;
   }
 
   if (!current.roomId) return <Spinner />;
 
   return (
-    <RoomProvider id={current.roomId} initialPresence={{ cursor: null }}>
-      <ClientSideSuspense fallback={<Spinner />}>{children}</ClientSideSuspense>
-    </RoomProvider>
+    <LiveblocksBoundary feature="Collaborative editing">
+      <RoomProvider id={current.roomId} initialPresence={{ cursor: null }}>
+        <ClientSideSuspense fallback={<Spinner />}>{children}</ClientSideSuspense>
+      </RoomProvider>
+    </LiveblocksBoundary>
   );
 }
 

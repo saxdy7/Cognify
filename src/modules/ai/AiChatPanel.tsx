@@ -8,6 +8,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { useShell } from '@/modules/main/ShellProvider';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { LiveblocksBoundary } from '@/components/LiveblocksBoundary';
 
 // Chats are private per authenticated user, so a fixed id gives each user
 // one persistent "Cognify assistant" thread.
@@ -60,13 +61,15 @@ export function AiChatPanel() {
             </SheetTitle>
             <SheetDescription>Your workspace copilot. It knows what you have saved.</SheetDescription>
           </SheetHeader>
-          <div className="min-h-0 flex-1">
-            <AiChat
-              chatId={CHAT_ID}
-              // copilotId="co_..." — create one in the Liveblocks dashboard to use your own model & prompt
-              components={{ Empty: EmptyChat }}
-              className="h-full"
-            />
+          <div className="min-h-0 flex-1 p-0 [&>div:has(>.lb-root)]:h-full">
+            <LiveblocksBoundary feature="Cognify AI">
+              <AiChat
+                chatId={CHAT_ID}
+                // copilotId="co_..." — create one in the Liveblocks dashboard to use your own model & prompt
+                components={{ Empty: EmptyChat }}
+                className="h-full"
+              />
+            </LiveblocksBoundary>
           </div>
         </SheetContent>
       </Sheet>
