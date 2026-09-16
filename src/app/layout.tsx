@@ -1,41 +1,36 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import "tldraw/tldraw.css";
-import { BackgroundBeams } from "@/components/BackgroundBeams";
-import { Toaster } from "sonner";
+// Liveblocks default styles (+ dark theme keyed off the `dark` class on <html>)
+import "@liveblocks/react-ui/styles.css";
+import "@liveblocks/react-ui/styles/dark/attributes.css";
+import "@liveblocks/react-tiptap/styles.css";
+import { ThemeProvider } from "@/lib/provider/ThemeProvider";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-heading" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "Cognify | Smart Bookmark Hub",
-  description: "Organize your digital life with AI-powered smart containers.",
+  title: {
+    default: "Cognify — Smart Bookmark Hub",
+    template: "%s · Cognify",
+  },
+  description: "Organize links, boards and docs in one collaborative workspace.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body
-        className={`${spaceGrotesk.variable} ${geistMono.variable} antialiased bg-white dark:bg-black relative min-h-screen`}
-        suppressHydrationWarning
-      >
-        <BackgroundBeams />
-        <div className="relative z-10" suppressHydrationWarning>
-          {children}
-        </div>
-        <Toaster position="top-right" theme="dark" richColors />
+    <html lang="en" suppressHydrationWarning>
+      <body className={cn(geist.variable, spaceGrotesk.variable, geistMono.variable, "min-h-screen antialiased")}>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+          <Toaster position="top-right" richColors closeButton />
+        </ThemeProvider>
       </body>
     </html>
   );
