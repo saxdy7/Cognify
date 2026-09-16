@@ -8,6 +8,7 @@ import { hostnameOf } from '@/lib/format';
 import { useShell } from '@/modules/main/ShellProvider';
 import { Button } from '@/components/ui/button';
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -60,6 +61,8 @@ export function SearchCommand() {
 
   return (
     <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} title="Search" description="Jump to anything in your workspace">
+      {/* This shadcn CommandDialog variant doesn't wrap children in <Command>, and cmdk's Input needs that store */}
+      <Command>
       <CommandInput placeholder="Type a command or search…" />
       <CommandList className="max-h-[420px]">
         <CommandEmpty>No results found.</CommandEmpty>
@@ -125,6 +128,7 @@ export function SearchCommand() {
           </>
         )}
       </CommandList>
+      </Command>
     </CommandDialog>
   );
 }
