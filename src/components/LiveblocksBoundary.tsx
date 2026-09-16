@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { PlugZap } from 'lucide-react';
+import { useLiveblocksConfigured } from '@/lib/provider/LiveblocksProvider';
 
 interface Props {
   children: React.ReactNode;
@@ -19,7 +20,17 @@ interface State { error: Error | null }
  * which would otherwise take down the whole dashboard. Pass `fallback={null}`
  * for decorative bits (badges, avatar stacks) and let real features explain.
  */
-export class LiveblocksBoundary extends React.Component<Props, State> {
+export function LiveblocksBoundary(props: Props) {
+  const configured = useLiveblocksConfigured();
+  // Known-unconfigured: don't even mount the Liveblocks hooks (they'd retry auth for a while).
+  if (configured === false) {
+    if (props.fallback !== undefined) return <>{props.fallback}</>;
+    return <LiveblocksUnavailable feature={props.feature} error={new Error('LIVEBLOCKS_SECRET_KEY is not set')} />;
+  }
+  return <LiveblocksErrorBoundary {...props} />;
+}
+
+class LiveblocksErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {

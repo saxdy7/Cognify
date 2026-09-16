@@ -27,3 +27,9 @@ export async function POST() {
 
   return new Response(body, { status });
 }
+
+// Lightweight readiness probe used by the client to skip Liveblocks UI entirely
+// (instead of retrying auth for ~30s) when the secret key isn't configured.
+export async function GET() {
+  return NextResponse.json({ configured: Boolean(process.env.LIVEBLOCKS_SECRET_KEY) });
+}
