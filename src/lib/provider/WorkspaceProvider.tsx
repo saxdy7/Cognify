@@ -103,25 +103,27 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const userRef = useRef<User | null>(null);
 
   // ── Loaders (one per table so realtime can refresh them independently) ──
-  const loadContainers = useCallback(async (uid: string) => {
-    const { data, error } = await supabase.from('containers').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+  // No user filter: RLS returns the user's own rows plus anything shared with
+  // them via the `shares` table (spaces, boards, pages). UI tells them apart
+  // with `row.user_id !== user.id`.
+  const loadContainers = useCallback(async () => {
+    const { data, error } = await supabase.from('containers').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     setContainers(data ?? []);
   }, []);
 
-  const loadBookmarks = useCallback(async (uid: string) => {
-    const { data, error } = await supabase.from('bookmarks').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+  const loadBookmarks = useCallback(async () => {
+    const { data, error } = await supabase.from('bookmarks').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     setBookmarks(data ?? []);
   }, []);
 
-  const loadBoards = useCallback(async (uid: string) => {
-    const { data, error } = await supabase.from('canvas_boards').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+  const loadBoards = useCallback(async () => {
+    const { data, error } = await supabase.from('canvas_boards').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     setBoards(data ?? []);
   }, []);
 
-  // RLS returns own pages + pages shared via note_shares
   const loadNotes = useCallback(async () => {
     const { data, error } = await supabase.from('notes').select('*').order('updated_at', { ascending: false });
     if (error) throw error;
@@ -131,7 +133,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     const uid = userRef.current?.id;
     if (!uid) return;
-    const results = await Promise.allSettled([loadContainers(uid), loadBookmarks(uid), loadBoards(uid), loadNotes()]);
+    const results = await Promise.allSettled([loadContainers(), loadBookmarks(), loadBoards(), loadNotes()]);
     const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
     if (failed) toast.error('Some data failed to load: ' + errMsg(failed.reason));
   }, [loadContainers, loadBookmarks, loadBoards, loadNotes]);
@@ -156,20 +158,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [router, refresh]);
 
   // ── Realtime: refetch the affected table when rows change elsewhere ──
+  // Unfiltered so collaborators' edits on shared items arrive too (RLS scopes the events).
   useEffect(() => {
     if (!user) return;
     const uid = user.id;
-    const own = `user_id=eq.${uid}`;
     const channel = supabase
       .channel(`workspace:${uid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'containers', filter: own }, () => loadContainers(uid).catch(() => {}))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookmarks', filter: own }, () => loadBookmarks(uid).catch(() => {}))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_boards', filter: own }, () => loadBoards(uid).catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'containers' }, () => loadContainers().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookmarks' }, () => loadBookmarks().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_boards' }, () => loadBoards().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, () => loadNotes().catch(() => {}))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'note_shares', filter: own }, () => loadNotes().catch(() => {}))
+      // Being invited to (or removed from) something changes what RLS lets us see
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shares', filter: `user_id=eq.${uid}` }, () => refresh().catch(() => {}))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, loadContainers, loadBookmarks, loadBoards, loadNotes]);
+  }, [user, loadContainers, loadBookmarks, loadBoards, loadNotes, refresh]);
 
   // ── Actions ──
   const signOut = useCallback(async () => {
@@ -194,9 +197,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       setContainers((prev) => prev.filter((c) => c.id !== id));
       setBookmarks((prev) => prev.map((b) => (b.container_id === id ? { ...b, container_id: undefined } : b)));
+      loadBookmarks().catch(() => {});
       toast.success('Space deleted');
     } catch (e) { toast.error('Failed to delete space: ' + errMsg(e)); }
-  }, []);
+  }, [loadBookmarks]);
 
   const addBookmark = useCallback(async (input: NewBookmarkInput) => {
     const uid = userRef.current?.id; if (!uid) return null;

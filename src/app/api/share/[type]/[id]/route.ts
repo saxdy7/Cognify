@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import { getLiveblocks, noteRoomId, userInfoFromSupabase } from '@/lib/liveblocks';
-import { accessFor, loadNoteWithShares, syncNoteRoom, type ShareRole } from '@/lib/note-access';
+import { getLiveblocks, userInfoFromSupabase } from '@/lib/liveblocks';
+import { RESOURCES, accessFor, isResourceType, loadResource, syncNoteRoom, type ResourceType, type ShareRole } from '@/lib/share';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase-server';
 
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ type: string; id: string }> };
 
 export interface Collaborator {
   userId: string;
@@ -15,18 +15,21 @@ export interface Collaborator {
   role: 'owner' | ShareRole;
 }
 
-// Shared setup: authenticate, load the note + shares, and compute the caller's role.
-async function loadContext(noteId: string) {
+// Shared setup: authenticate, load the resource + shares, compute the caller's role.
+async function loadContext(typeParam: string, id: string) {
+  if (!isResourceType(typeParam)) return { error: NextResponse.json({ error: 'Unknown resource type' }, { status: 400 }) };
+  const type: ResourceType = typeParam;
+
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
 
   const admin = createSupabaseAdminClient();
-  const loaded = await loadNoteWithShares(admin, noteId);
-  const access = loaded ? accessFor(loaded.note, loaded.shares, user.id) : null;
+  const loaded = await loadResource(admin, type, id);
+  const access = loaded ? accessFor(loaded.resource, loaded.shares, user.id) : null;
   if (!loaded || !access) return { error: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
 
-  return { user, admin, access, ...loaded };
+  return { type, user, admin, access, ...loaded };
 }
 
 async function toCollaborator(admin: SupabaseClient, userId: string, role: Collaborator['role']): Promise<Collaborator> {
@@ -49,26 +52,25 @@ async function findUserByEmail(admin: SupabaseClient, email: string): Promise<Us
   return null;
 }
 
-// GET — list everyone with access to this page (owner first).
+// GET — everyone with access (owner first).
 export async function GET(_request: NextRequest, { params }: Params) {
-  const { id } = await params;
-  const ctx = await loadContext(id);
+  const { type, id } = await params;
+  const ctx = await loadContext(type, id);
   if ('error' in ctx) return ctx.error;
 
   const collaborators = await Promise.all([
-    toCollaborator(ctx.admin, ctx.note.user_id, 'owner'),
+    toCollaborator(ctx.admin, ctx.resource.user_id, 'owner'),
     ...ctx.shares.map((s) => toCollaborator(ctx.admin, s.user_id, s.role)),
   ]);
-
   return NextResponse.json({ access: ctx.access, collaborators });
 }
 
 // POST { email, role } — owner invites a user (or changes their role).
 export async function POST(request: NextRequest, { params }: Params) {
-  const { id } = await params;
-  const ctx = await loadContext(id);
+  const { type, id } = await params;
+  const ctx = await loadContext(type, id);
   if ('error' in ctx) return ctx.error;
-  if (ctx.access !== 'owner') return NextResponse.json({ error: 'Only the owner can share this page' }, { status: 403 });
+  if (ctx.access !== 'owner') return NextResponse.json({ error: `Only the owner can share this ${RESOURCES[ctx.type].label}` }, { status: 403 });
 
   const body = (await request.json().catch(() => ({}))) as { email?: string; role?: string };
   const role: ShareRole = body.role === 'view' ? 'view' : 'edit';
@@ -81,48 +83,51 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
   if (!invitee) return NextResponse.json({ error: 'No Cognify account with that email' }, { status: 404 });
-  if (invitee.id === ctx.note.user_id) return NextResponse.json({ error: 'That user already owns this page' }, { status: 400 });
+  if (invitee.id === ctx.resource.user_id) return NextResponse.json({ error: `That user already owns this ${RESOURCES[ctx.type].label}` }, { status: 400 });
 
   const { error } = await ctx.admin
-    .from('note_shares')
-    .upsert({ note_id: id, user_id: invitee.id, role, invited_by: ctx.user.id }, { onConflict: 'note_id,user_id' });
+    .from('shares')
+    .upsert({ resource_type: ctx.type, resource_id: id, user_id: invitee.id, role, invited_by: ctx.user.id }, { onConflict: 'resource_type,resource_id,user_id' });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const isNew = !ctx.shares.some((s) => s.user_id === invitee!.id);
   const shares = [
     ...ctx.shares.filter((s) => s.user_id !== invitee!.id),
-    { note_id: id, user_id: invitee.id, role, invited_by: ctx.user.id, created_at: new Date().toISOString() },
+    { resource_type: ctx.type, resource_id: id, user_id: invitee.id, role, invited_by: ctx.user.id, created_at: new Date().toISOString() },
   ];
 
   try {
-    await syncNoteRoom(ctx.note, shares);
+    // Notes also live in a Liveblocks room whose permissions mirror the DB.
+    if (ctx.type === 'note') await syncNoteRoom(ctx.resource, shares);
 
-    // Let the invitee know via their Liveblocks inbox (rendered in NotificationsInbox).
+    // Tell the invitee via their Liveblocks inbox (rendered in the Inbox page).
     if (isNew) {
       await getLiveblocks().triggerInboxNotification({
         userId: invitee.id,
-        kind: '$pageShared',
-        subjectId: id,
-        roomId: noteRoomId(id),
+        kind: '$resourceShared',
+        subjectId: `${ctx.type}:${id}`,
+        ...(ctx.type === 'note' ? { roomId: `note:${id}` } : {}),
         activityData: {
-          noteId: id,
-          title: ctx.note.title || 'Untitled',
+          resourceType: ctx.type,
+          resourceId: id,
+          title: ctx.resource.title || 'Untitled',
           sharedBy: userInfoFromSupabase(ctx.user).name,
           role,
         },
       });
     }
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    // Sharing itself succeeded; Liveblocks is best-effort (e.g. key not configured)
+    console.warn('[share] liveblocks sync failed:', (e as Error).message);
   }
 
   return NextResponse.json({ collaborator: await toCollaborator(ctx.admin, invitee.id, role) });
 }
 
-// DELETE { userId } — owner revokes access, or a collaborator leaves the page.
+// DELETE { userId } — owner revokes access, or a collaborator leaves.
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const { id } = await params;
-  const ctx = await loadContext(id);
+  const { type, id } = await params;
+  const ctx = await loadContext(type, id);
   if ('error' in ctx) return ctx.error;
 
   const body = (await request.json().catch(() => ({}))) as { userId?: string };
@@ -130,15 +135,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (ctx.access !== 'owner' && targetId !== ctx.user.id) {
     return NextResponse.json({ error: 'Only the owner can remove other collaborators' }, { status: 403 });
   }
-  if (targetId === ctx.note.user_id) return NextResponse.json({ error: 'The owner cannot be removed' }, { status: 400 });
+  if (targetId === ctx.resource.user_id) return NextResponse.json({ error: 'The owner cannot be removed' }, { status: 400 });
 
-  const { error } = await ctx.admin.from('note_shares').delete().eq('note_id', id).eq('user_id', targetId);
+  const { error } = await ctx.admin.from('shares').delete().eq('resource_type', ctx.type).eq('resource_id', id).eq('user_id', targetId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  try {
-    await syncNoteRoom(ctx.note, ctx.shares.filter((s) => s.user_id !== targetId), [targetId]);
-  } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  if (ctx.type === 'note') {
+    try {
+      await syncNoteRoom(ctx.resource, ctx.shares.filter((s) => s.user_id !== targetId), [targetId]);
+    } catch (e) {
+      console.warn('[share] liveblocks sync failed:', (e as Error).message);
+    }
   }
 
   return NextResponse.json({ ok: true });

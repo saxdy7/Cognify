@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLiveblocks } from '@/lib/liveblocks';
-import { accessFor, loadNoteWithShares, syncNoteRoom } from '@/lib/note-access';
+import { accessFor, loadResource, syncNoteRoom } from '@/lib/share';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase-server';
 
 // ID tokens require rooms to exist with explicit permissions. This endpoint
-// creates (or refreshes) the room for a doc page from the owner + note_shares,
+// creates (or refreshes) the room for a doc page from the owner + shares,
 // then tells the client which role it has. Called by <NoteRoom> before joining.
 export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
@@ -20,12 +20,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 
-  const loaded = await loadNoteWithShares(createSupabaseAdminClient(), noteId);
-  const access = loaded ? accessFor(loaded.note, loaded.shares, user.id) : null;
+  const loaded = await loadResource(createSupabaseAdminClient(), 'note', noteId);
+  const access = loaded ? accessFor(loaded.resource, loaded.shares, user.id) : null;
   if (!loaded || !access) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const roomId = await syncNoteRoom(loaded.note, loaded.shares);
+  const roomId = await syncNoteRoom(loaded.resource, loaded.shares);
   return NextResponse.json({ roomId, access });
 }

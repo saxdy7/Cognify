@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Layers, Loader2, MoreHorizontal, Plus, Search, SortAsc, SortDesc, Trash2 } from 'lucide-react';
+import { Layers, Loader2, MoreHorizontal, Plus, Search, SortAsc, SortDesc, Trash2, Users } from 'lucide-react';
 import type { CanvasBoard } from '@/types';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { timeAgo } from '@/lib/format';
@@ -11,7 +11,9 @@ import { gradientFor } from '@/lib/static';
 import { cn } from '@/lib/utils';
 import { PageHeader, SectionHeader } from '@/modules/main/PageHeader';
 import { TemplateGallery } from '@/modules/canvas/TemplateGallery';
+import { ShareDialog } from '@/modules/main/ShareDialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardFooter, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,11 +28,12 @@ import {
 
 export function CanvasBoardsPage() {
   const router = useRouter();
-  const { loading, boards, addBoard, deleteBoard } = useWorkspace();
+  const { loading, boards, user, addBoard, deleteBoard } = useWorkspace();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'desc' | 'asc'>('desc');
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<CanvasBoard | null>(null);
+  const [sharing, setSharing] = useState<CanvasBoard | null>(null);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -76,7 +79,12 @@ export function CanvasBoardsPage() {
                 <Card key={b.id} className={cn('group relative h-[180px] overflow-hidden bg-linear-to-br p-0 transition-transform hover:scale-[1.02]', gradientFor(i))}>
                   <Link href={`/dashboard/canvas/${b.id}`} className="absolute inset-0" aria-label={`Open ${b.name}`} />
                   <CardHeader className="flex-row items-start justify-between p-4">
-                    <h3 className="truncate text-base font-semibold">{b.name}</h3>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-semibold">{b.name}</h3>
+                      {b.user_id !== user?.id && (
+                        <Badge variant="secondary" className="mt-1 gap-1 text-[10px]"><Users className="size-3" />Shared with you</Badge>
+                      )}
+                    </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon-sm" className="relative z-10 bg-background/40 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100" aria-label="Board options">
@@ -85,7 +93,10 @@ export function CanvasBoardsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={() => router.push(`/dashboard/canvas/${b.id}`)}>Open</DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(b)}><Trash2 />Delete</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSharing(b)}><Users />{b.user_id === user?.id ? 'Share' : 'People with access'}</DropdownMenuItem>
+                        {b.user_id === user?.id && (
+                          <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(b)}><Trash2 />Delete</DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </CardHeader>
@@ -104,6 +115,14 @@ export function CanvasBoardsPage() {
 
       <Separator />
       <TemplateGallery />
+
+      {sharing && (
+        <ShareDialog
+          resource={{ type: 'board', id: sharing.id, title: sharing.name }}
+          isOwner={sharing.user_id === user?.id}
+          onClose={() => setSharing(null)}
+        />
+      )}
 
       <CreateBoardDialog open={createOpen} onOpenChange={setCreateOpen} onCreate={async (name) => { const b = await addBoard(name); if (b) router.push(`/dashboard/canvas/${b.id}`); }} />
 

@@ -59,7 +59,7 @@ Route pages are thin wrappers; all UI lives in `modules/`. Pages read data with
 `useWorkspace()` (own + shared pages, optimistic CRUD, Supabase Realtime) and
 open overlays via `useShell()` (⌘K palette, AI copilot).
 
-Run the SQL files in `supabase-*.sql` once in the Supabase SQL editor, and set
+Run the SQL files in `supabase-*.sql` once in the Supabase SQL editor (`supabase-shares-schema.sql` last — it enables sharing pages, boards and spaces), and set
 `LIVEBLOCKS_SECRET_KEY` in `.env.local`.
 
 ## Getting Started

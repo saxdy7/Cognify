@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { NoteEditor } from '@/modules/docs/NoteEditor';
 import { NoteRoom } from '@/modules/docs/NoteRoom';
 import { NotionDatabase } from '@/modules/docs/NotionDatabase';
-import { ShareDialog } from '@/modules/docs/ShareDialog';
+import { ShareDialog } from '@/modules/main/ShareDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -158,7 +158,7 @@ export function NotePage({ noteId }: { noteId: string }) {
       )}
 
       {shareOpen && (
-        <ShareDialog noteId={note.id} noteTitle={note.title} isOwner={isOwner} onClose={() => setShareOpen(false)} onLeft={() => router.push('/dashboard/docs')} />
+        <ShareDialog resource={{ type: 'note', id: note.id, title: note.title }} isOwner={isOwner} onClose={() => setShareOpen(false)} onLeft={() => router.push('/dashboard/docs')} />
       )}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>

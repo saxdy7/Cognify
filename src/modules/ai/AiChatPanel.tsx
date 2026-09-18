@@ -65,7 +65,9 @@ export function AiChatPanel() {
             <LiveblocksBoundary feature="Cognify AI">
               <AiChat
                 chatId={CHAT_ID}
-                // copilotId="co_..." — create one in the Liveblocks dashboard to use your own model & prompt
+                // Optional: a copilot created in the Liveblocks dashboard (your own provider key + prompt).
+                // Without it the Liveblocks-hosted default model is used, which is rate/plan limited.
+                copilotId={process.env.NEXT_PUBLIC_LIVEBLOCKS_COPILOT_ID || undefined}
                 components={{ Empty: EmptyChat }}
                 className="h-full"
               />

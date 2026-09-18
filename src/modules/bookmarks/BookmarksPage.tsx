@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Bookmark as BookmarkIcon, Folder, FolderPlus, LayoutGrid, List, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
+import { Bookmark as BookmarkIcon, Folder, FolderPlus, LayoutGrid, List, MoreHorizontal, Plus, Search, Trash2, Users } from 'lucide-react';
 import type { Bookmark } from '@/types';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { isToday } from '@/lib/format';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { PageHeader } from '@/modules/main/PageHeader';
 import { BookmarkCard } from '@/modules/bookmarks/BookmarkCard';
 import { CreateSpaceDialog, EditLinkDialog, SaveLinkDialog } from '@/modules/bookmarks/BookmarkDialogs';
+import { ShareDialog } from '@/modules/main/ShareDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,7 +35,7 @@ export function BookmarksPage() {
   const pathname = usePathname();
   const params = useSearchParams();
   const {
-    loading, bookmarks, containers,
+    loading, bookmarks, containers, user,
     addBookmark, updateBookmark, deleteBookmark, toggleFavorite, toggleShortcut, addContainer, deleteContainer,
   } = useWorkspace();
 
@@ -47,6 +48,7 @@ export function BookmarksPage() {
   const [editing, setEditing] = useState<Bookmark | null>(null);
   const [deleting, setDeleting] = useState<Bookmark | null>(null);
   const [deletingSpace, setDeletingSpace] = useState<string | null>(null);
+  const [sharingSpace, setSharingSpace] = useState<string | null>(null);
 
   const changeView = (v: View) => setView(v);
 
@@ -77,6 +79,8 @@ export function BookmarksPage() {
   }, [bookmarks, space, filter, query]);
 
   const currentSpace = space ? containers.find((c) => c.id === space) : null;
+  const ownsSpace = (id: string) => containers.find((c) => c.id === id)?.user_id === user?.id;
+  const sharingTarget = sharingSpace ? containers.find((c) => c.id === sharingSpace) : null;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
@@ -84,9 +88,14 @@ export function BookmarksPage() {
         icon={BookmarkIcon}
         iconClassName="text-brand"
         title={currentSpace ? currentSpace.name : 'Bookmarks'}
-        description={currentSpace ? `${countBySpace[currentSpace.id] ?? 0} links in this space` : 'Every link you’ve saved, organised into spaces.'}
+        description={currentSpace ? `${countBySpace[currentSpace.id] ?? 0} links in this space${currentSpace.user_id !== user?.id ? ' · shared with you' : ''}` : 'Every link you’ve saved, organised into spaces.'}
         actions={
           <>
+            {currentSpace && (
+              <Button variant="outline" size="sm" onClick={() => setSharingSpace(currentSpace.id)}>
+                <Users />{currentSpace.user_id === user?.id ? 'Share space' : 'Shared'}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setSpaceOpen(true)}><FolderPlus />New space</Button>
             <Button size="sm" onClick={() => setSaveOpen(true)}><Plus />Save link</Button>
           </>
@@ -103,7 +112,7 @@ export function BookmarksPage() {
                 key={c.id}
                 active={space === c.id}
                 onClick={() => setParam('space', c.id)}
-                icon={c.icon ? <span className="text-sm leading-none">{c.icon}</span> : <Folder className="size-3.5" />}
+                icon={c.icon ? <span className="text-sm leading-none">{c.icon}</span> : c.user_id !== user?.id ? <Users className="size-3.5 text-brand" /> : <Folder className="size-3.5" />}
                 label={c.name}
                 count={countBySpace[c.id] ?? 0}
                 menu={
@@ -114,7 +123,10 @@ export function BookmarksPage() {
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem variant="destructive" onSelect={() => setDeletingSpace(c.id)}><Trash2 />Delete space</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSharingSpace(c.id)}><Users />{ownsSpace(c.id) ? 'Share space' : 'People with access'}</DropdownMenuItem>
+                      {ownsSpace(c.id) && (
+                        <DropdownMenuItem variant="destructive" onSelect={() => setDeletingSpace(c.id)}><Trash2 />Delete space</DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 }
@@ -192,6 +204,15 @@ export function BookmarksPage() {
       {/* Dialogs */}
       <SaveLinkDialog open={saveOpen} onOpenChange={(o) => { setSaveOpen(o); if (!o && params.get('new')) setParam('new', null); }} containers={containers} defaultContainerId={space} onSave={addBookmark} />
       <EditLinkDialog bookmark={editing} containers={containers} onOpenChange={(o) => !o && setEditing(null)} onSave={updateBookmark} />
+      {sharingTarget && (
+        <ShareDialog
+          resource={{ type: 'container', id: sharingTarget.id, title: sharingTarget.name }}
+          isOwner={sharingTarget.user_id === user?.id}
+          onClose={() => setSharingSpace(null)}
+          onLeft={() => { if (space === sharingTarget.id) setParam('space', null); }}
+        />
+      )}
+
       <CreateSpaceDialog open={spaceOpen} onOpenChange={setSpaceOpen} onCreate={async (name) => { const c = await addContainer(name); if (c) setParam('space', c.id); }} />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>

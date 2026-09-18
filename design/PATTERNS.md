@@ -44,18 +44,18 @@ Supabase
 - Pages **never** import `supabase` (exception: `TemplateGallery`, `MilanoteCanvas` — the
   canvas is a self-contained tool).
 - Realtime keeps multiple tabs / collaborators' lists in sync without polling.
-- Shared docs arrive through RLS (`notes` SELECT policy includes `has_note_share`), so the
+- Shared docs arrive through RLS (`notes`/`canvas_boards`/`containers` SELECT policies include `has_share()`), so the
   same `notes` array contains own + shared pages; UI distinguishes with `n.user_id !== user.id`.
 
 Liveblocks is a second, parallel data plane for **in-document** state:
 
 ```
 LiveblocksProviders (authEndpoint=/api/liveblocks-auth, resolveUsers, resolveMentionSuggestions)
-   └─ NoteRoom → POST /api/liveblocks-rooms (ensures room + permissions from note_shares)
+   └─ NoteRoom → POST /api/liveblocks-rooms (ensures room + permissions from `shares`)
         └─ RoomProvider(note:<id>) → NoteEditor (Yjs) · Threads (comments) · AvatarStack
 ```
 
-Permissions are derived from the DB on every room open (`lib/note-access.ts`), so the DB
+Permissions are derived from the DB on every room open (`lib/share.ts`), so the DB
 is the single source of truth and Liveblocks is never edited by hand.
 
 ---

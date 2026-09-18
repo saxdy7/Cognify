@@ -5,7 +5,8 @@ import { Crown, Eye, Loader2, LogOut, Mail, Pencil, Trash2, UserPlus } from 'luc
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { initialsOf } from '@/lib/format';
-import type { Collaborator } from '@/app/api/notes/[id]/share/route';
+import type { Collaborator } from '@/app/api/share/[type]/[id]/route';
+import type { ResourceType } from '@/lib/share';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,20 +18,28 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Role = 'view' | 'edit';
 
-interface ShareDialogProps {
-  noteId: string;
-  noteTitle: string;
+export interface ShareDialogProps {
+  /** What is being shared: a doc page, a canvas board, or a bookmark space */
+  resource: { type: ResourceType; id: string; title: string };
   isOwner: boolean;
   onClose: () => void;
-  /** Fired when the current user removes themself from a shared page */
+  /** Fired when the current user removes themself from a shared resource */
   onLeft?: () => void;
 }
 
+const LABEL: Record<ResourceType, { noun: string; editorCan: string }> = {
+  note: { noun: 'page', editorCan: 'change the page; viewers can read and comment' },
+  board: { noun: 'board', editorCan: 'add and move cards; viewers can only look' },
+  container: { noun: 'space', editorCan: 'add and edit links in it; viewers can only browse' },
+};
+
 /**
- * Invite / manage collaborators on a doc page. Talks to /api/notes/[id]/share,
- * which also keeps the Liveblocks room permissions in sync.
+ * Invite / manage collaborators on any shareable resource. Talks to
+ * /api/share/[type]/[id], which (for pages) also keeps Liveblocks permissions in sync.
  */
-export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: ShareDialogProps) {
+export function ShareDialog({ resource, isOwner, onClose, onLeft }: ShareDialogProps) {
+  const endpoint = `/api/share/${resource.type}/${resource.id}`;
+  const label = LABEL[resource.type];
   const [collaborators, setCollaborators] = useState<Collaborator[] | null>(null);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('edit');
@@ -38,7 +47,7 @@ export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: Sha
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/notes/${noteId}/share`)
+    fetch(endpoint)
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to load collaborators');
         return res.json() as Promise<{ collaborators: Collaborator[] }>;
@@ -46,10 +55,10 @@ export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: Sha
       .then(({ collaborators }) => { if (!cancelled) setCollaborators(collaborators); })
       .catch((e: Error) => { if (!cancelled) { toast.error(e.message); setCollaborators([]); } });
     return () => { cancelled = true; };
-  }, [noteId]);
+  }, [endpoint]);
 
   const post = async (body: { email: string; role: Role }) => {
-    const res = await fetch(`/api/notes/${noteId}/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Request failed');
     return data.collaborator as Collaborator;
@@ -63,7 +72,7 @@ export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: Sha
       const c = await post({ email: email.trim(), role });
       setCollaborators((prev) => [...(prev ?? []).filter((x) => x.userId !== c.userId), c]);
       setEmail('');
-      toast.success(`${c.name} can now ${c.role === 'edit' ? 'edit' : 'view'} this page`);
+      toast.success(`${c.name} can now ${c.role === 'edit' ? 'edit' : 'view'} this ${label.noun}`);
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -89,10 +98,10 @@ export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: Sha
     const key = userId ?? 'me';
     setBusy(key);
     try {
-      const res = await fetch(`/api/notes/${noteId}/share`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userId ? { userId } : {}) });
+      const res = await fetch(endpoint, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userId ? { userId } : {}) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to remove');
       if (userId) setCollaborators((prev) => (prev ?? []).filter((x) => x.userId !== userId));
-      else { toast.success('You left this page'); onLeft?.(); onClose(); }
+      else { toast.success(`You left this ${label.noun}`); onLeft?.(); onClose(); }
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -104,9 +113,9 @@ export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: Sha
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Share “{noteTitle || 'Untitled'}”</DialogTitle>
+          <DialogTitle>Share “{resource.title || 'Untitled'}”</DialogTitle>
           <DialogDescription>
-            {isOwner ? 'Invite people by email. Editors can change the page; viewers can read and comment.' : 'People who have access to this page.'}
+            {isOwner ? `Invite people by email. Editors can ${label.editorCan}.` : `People who have access to this ${label.noun}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -171,7 +180,7 @@ export function ShareDialog({ noteId, noteTitle, isOwner, onClose, onLeft }: Sha
         {!isOwner && (
           <DialogFooter>
             <Button variant="outline" onClick={() => remove()} disabled={busy === 'me'} className="hover:text-destructive">
-              {busy === 'me' ? <Loader2 className="animate-spin" /> : <LogOut />} Leave this page
+              {busy === 'me' ? <Loader2 className="animate-spin" /> : <LogOut />} Leave this {label.noun}
             </Button>
           </DialogFooter>
         )}

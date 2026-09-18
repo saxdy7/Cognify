@@ -10,6 +10,7 @@ import {
 import { InboxNotification, InboxNotificationList } from '@liveblocks/react-ui';
 import { Bell, CheckCheck, Users } from 'lucide-react';
 import { PageHeader } from '@/modules/main/PageHeader';
+import { RESOURCES } from '@/lib/share';
 import { LiveblocksBoundary } from '@/components/LiveblocksBoundary';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,7 +58,24 @@ function InboxList() {
                 key={inboxNotification.id}
                 inboxNotification={inboxNotification}
                 kinds={{
-                  // Custom kind triggered by /api/notes/[id]/share
+                  // Custom kind triggered by /api/share/[type]/[id]
+                  $resourceShared: (props) => {
+                    const { title, sharedBy, role, resourceType, resourceId } = props.inboxNotification.activities[0].data;
+                    const href = RESOURCES[resourceType].href(resourceId);
+                    const noun = RESOURCES[resourceType].label;
+                    return (
+                      <InboxNotification.Custom
+                        {...props}
+                        title={<><strong>{sharedBy}</strong> shared the {noun} <strong>{title}</strong> with you</>}
+                        aside={<InboxNotification.Icon className="text-docs"><Users className="size-4" /></InboxNotification.Icon>}
+                        href={href}
+                        onClick={(e) => { e.preventDefault(); router.push(href); }}
+                      >
+                        You can {role === 'edit' ? 'edit' : 'view'} this {noun}.
+                      </InboxNotification.Custom>
+                    );
+                  },
+                  // Legacy v1 kind (pages only)
                   $pageShared: (props) => {
                     const { title, sharedBy, role, noteId } = props.inboxNotification.activities[0].data;
                     return (

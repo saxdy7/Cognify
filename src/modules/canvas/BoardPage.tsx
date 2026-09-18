@@ -4,7 +4,9 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { ArrowLeft, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Layers, Users } from 'lucide-react';
+import { ShareDialog } from '@/modules/main/ShareDialog';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +23,7 @@ export function BoardPage({ boardId }: { boardId: string }) {
   const { loading, boards, user } = useWorkspace();
   const { resolvedTheme, setTheme } = useTheme();
   const board = boards.find((b) => b.id === boardId);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // The canvas has its own light/dark toggle — drive it from (and write back to) the app theme.
   const canvasTheme: 'light' | 'dark' = resolvedTheme === 'light' ? 'light' : 'dark';
@@ -47,6 +50,18 @@ export function BoardPage({ boardId }: { boardId: string }) {
   return (
     <div className="p-3 md:p-4">
       <div className="relative h-[calc(100vh-5.5rem)] overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
+        {/* Share sits above the canvas' own toolbar, top-right */}
+        <Button variant="outline" size="sm" onClick={() => setShareOpen(true)} className="absolute top-3 right-3 z-20 bg-background/80 backdrop-blur">
+          <Users />{board.user_id === user.id ? 'Share' : 'Shared'}
+        </Button>
+        {shareOpen && (
+          <ShareDialog
+            resource={{ type: 'board', id: board.id, title: board.name }}
+            isOwner={board.user_id === user.id}
+            onClose={() => setShareOpen(false)}
+            onLeft={() => router.push('/dashboard/canvas')}
+          />
+        )}
         <MilanoteCanvas
           board={board}
           userId={user.id}

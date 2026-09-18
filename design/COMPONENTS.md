@@ -222,7 +222,7 @@ Two renders from one component via `view="grid" | "list"`.
 | `NoteRoom` | `modules/docs/NoteRoom.tsx` | provisions room via `/api/liveblocks-rooms`, then `RoomProvider` + `ClientSideSuspense`. |
 | `NoteEditor` | `modules/docs/NoteEditor.tsx` | Tiptap + `useLiveblocksExtension`; sticky toolbar (`top-14`), `AvatarStack`, comment button, bubble menu, drag handle. Read-only when `!canWrite`. |
 | `Threads` | `modules/docs/Threads.tsx` | `AnchoredThreads` (≥xl, absolute column right of the editor) / `FloatingThreads` + `FloatingComposer`. |
-| `ShareDialog` | `modules/docs/ShareDialog.tsx` | invite form (email + role `Select` + Invite), people list with avatar ring in user colour, role select / remove for owner, "Leave this page" for guests. |
+| `ShareDialog` | `modules/main/ShareDialog.tsx` | invite form (email + role `Select` + Invite), people list with avatar ring in user colour, role select / remove for owner, "Leave this page" for guests. |
 | `AiChatPanel` | `modules/ai/AiChatPanel.tsx` | `Sheet` with `AiChat` + `RegisterAiKnowledge`; custom `Empty` with 3 suggestion buttons. |
 
 ---

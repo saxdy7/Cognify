@@ -27,8 +27,16 @@ declare global {
       resolved?: boolean;
     };
 
-    // Custom inbox notification kinds (triggered from /api/notes/[id]/share)
+    // Custom inbox notification kinds (triggered from /api/share/[type]/[id])
     ActivitiesData: {
+      $resourceShared: {
+        resourceType: 'note' | 'board' | 'container';
+        resourceId: string;
+        title: string;
+        sharedBy: string;
+        role: 'view' | 'edit';
+      };
+      // Legacy kind from v1 (notes only) — kept so old inbox items still render
       $pageShared: {
         noteId: string;
         title: string;

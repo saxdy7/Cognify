@@ -39,7 +39,7 @@ export function AppSidebar() {
 
   const favoriteLinks = bookmarks.filter((b) => b.is_favorite).slice(0, 5);
   const recentPages = [...notes]
-    .filter((n) => n.user_id === user?.id && !n.parent_id)
+    .filter((n) => !n.parent_id || n.user_id !== user?.id)
     .sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at))
     .slice(0, 6);
   const recentBoards = boards.slice(0, 6);
