@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Twitter, Github, Linkedin, Mail } from 'lucide-react';
+import { Twitter, Github, Linkedin, Mail } from 'lucide-react';
 import Link from 'next/link';
 
 export const LandingFooter = () => {
@@ -11,8 +11,8 @@ export const LandingFooter = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 lg:gap-16 mb-12 md:mb-16 lg:mb-24">
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-8 group">
-              <div className="w-10 h-10 bg-black dark:bg-white rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12">
-                <Sparkles className="w-6 h-6 text-white dark:text-black" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/15 shadow-md flex items-center justify-center transition-transform group-hover:scale-105">
+                <img src="/logo-mark.png" alt="Cognify" className="w-full h-full object-cover scale-105" />
               </div>
               <span className="text-xl font-bold font-space-grotesk tracking-tight">Cognify</span>
             </Link>

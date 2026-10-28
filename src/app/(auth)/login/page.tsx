@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, Mail, Lock, ArrowRight, Loader2, Github, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { EnergyBeam } from '@/components/motion/energy-beam';
 
@@ -61,19 +61,7 @@ function LoginForm() {
     }
   };
 
-  const handleGithubLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
+
 
   if (!mounted) {
     return <Loader2 className="w-10 h-10 animate-spin text-zinc-400" />;
@@ -88,8 +76,8 @@ function LoginForm() {
       >
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-3 mb-6 group">
-            <div className="w-12 h-12 bg-black dark:bg-white rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-12">
-              <Sparkles className="w-7 h-7 text-white dark:text-black" />
+            <div className="w-14 h-14 rounded-2xl overflow-hidden bg-black border border-white/15 shadow-[0_0_25px_rgba(255,107,0,0.35)] flex items-center justify-center mx-auto transition-transform group-hover:scale-105">
+              <img src="/logo-mark.png" alt="Cognify" className="w-full h-full object-cover scale-105" />
             </div>
           </Link>
           <h1 className="text-3xl font-bold font-space-grotesk tracking-tight mb-2">
@@ -169,23 +157,7 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="relative my-10">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-zinc-100 dark:border-zinc-800" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-widest text-zinc-400">
-            <span className="bg-white dark:bg-black px-4">Or continue with</span>
-          </div>
-        </div>
 
-        <button
-          onClick={handleGithubLogin}
-          suppressHydrationWarning
-          className="w-full py-5 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
-        >
-          <Github className="w-6 h-6" />
-          GitHub
-        </button>
 
         <p className="mt-10 text-center text-zinc-500">
           {mode === 'login' ? "Don't have an account?" : "Already have an account?"}{' '}

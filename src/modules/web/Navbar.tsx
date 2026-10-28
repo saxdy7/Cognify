@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
-import { Sparkles, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { HyperText } from '@/components/motion/hyper-text';
 
@@ -20,8 +20,8 @@ export const LandingNavbar = () => {
       <div className="max-w-7xl mx-auto px-6">
         <div className={`relative flex items-center justify-between px-8 py-4 rounded-3xl transition-all duration-500 ${scrolled ? 'bg-black/80 dark:bg-black/80 backdrop-blur-2xl shadow-2xl border border-white/10' : 'bg-transparent'}`}>
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12 shadow-[0_0_20px_rgba(249,115,22,0.4)]">
-              <Sparkles className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/15 shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_30px_rgba(255,107,0,0.6)] flex items-center justify-center">
+              <img src="/logo-mark.png" alt="Cognify" className="w-full h-full object-cover scale-105" />
             </div>
             <span className="text-xl font-black font-space-grotesk tracking-tight text-white">Cognify</span>
           </Link>

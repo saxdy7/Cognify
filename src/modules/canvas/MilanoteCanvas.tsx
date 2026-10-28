@@ -812,36 +812,36 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         <div className="flex items-center gap-3">
           {/* Share button pulled to the left side with distinct separation */}
           {headerActions && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mr-1">
               {headerActions}
               <div className={`h-4 w-px ${dark ? 'bg-zinc-800' : 'bg-zinc-300'}`} />
             </div>
           )}
 
-          {/* Zoom controls: fully visible [- 100% +] */}
-          <div className={`flex items-center gap-1 px-1.5 py-1 border rounded-xl shadow-xs select-none ${dark ? 'bg-zinc-900/90 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
+          {/* Zoom controls: fully visible with distinct buttons [- 100% +] */}
+          <div className={`flex items-center gap-1.5 px-2 py-1 border rounded-xl shadow-xs select-none ${dark ? 'bg-zinc-900/90 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
             <button
               onClick={() => zoomBy(0.9)}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${dark ? 'hover:bg-white/10 text-zinc-200 hover:text-white' : 'hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900'}`}
+              className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ${dark ? 'bg-zinc-800/80 hover:bg-zinc-700 border-white/10 text-white shadow-xs' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-900 shadow-xs'}`}
               title="Zoom out (-)"
               aria-label="Zoom out"
             >
-              <Minus className="w-4 h-4 stroke-[2.5]" />
+              <Minus className="w-3.5 h-3.5 stroke-[2.75]" />
             </button>
             <button
               onClick={resetView}
-              className={`px-2.5 py-0.5 text-xs font-black tabular-nums min-w-[52px] text-center rounded-md transition-colors cursor-pointer ${dark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-100 text-zinc-900'}`}
+              className={`px-2 py-0.5 text-xs font-black tabular-nums min-w-[50px] text-center rounded-md transition-colors cursor-pointer ${dark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-100 text-zinc-900'}`}
               title="Reset zoom to 100%"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               onClick={() => zoomBy(1.1)}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${dark ? 'hover:bg-white/10 text-zinc-200 hover:text-white' : 'hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900'}`}
+              className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ${dark ? 'bg-zinc-800/80 hover:bg-zinc-700 border-white/10 text-white shadow-xs' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-900 shadow-xs'}`}
               title="Zoom in (+)"
               aria-label="Zoom in"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Plus className="w-3.5 h-3.5 stroke-[2.75]" />
             </button>
           </div>
 
