@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { EnergyBeam } from '@/components/motion/energy-beam';
 import { BlurText } from '@/components/motion/blur-text';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 export const LandingHero = () => {

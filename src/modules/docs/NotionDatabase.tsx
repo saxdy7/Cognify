@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Plus, Trash2, Type, CheckSquare, Link2, Hash, ChevronDown, Tag, X, Check, GripVertical, Loader2,
+  Plus, Trash2, Type, CheckSquare, Link2, Hash, ChevronDown, Tag, X, Check, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -97,7 +97,7 @@ export function NotionDatabase({ content, onChange }: NotionDatabaseProps) {
     commit({
       ...db,
       columns: db.columns.filter(c => c.id !== colId),
-      rows: db.rows.map(r => { const { [colId]: _, ...rest } = r.cells; return { ...r, cells: rest }; }),
+      rows: db.rows.map(r => { const { [colId]: _val, ...rest } = r.cells; void _val; return { ...r, cells: rest }; }),
     });
     setColMenu(null);
   };

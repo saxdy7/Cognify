@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useImperativeHandle, useState, forwardRef } from 'react';
+import React, { useImperativeHandle, useState, forwardRef } from 'react';
 import { Editor, Extension, Range } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
@@ -45,7 +45,11 @@ interface ListHandle { onKeyDown: (props: { event: KeyboardEvent }) => boolean; 
 const SlashCommandList = forwardRef<ListHandle, { items: CommandItem[]; command: (item: CommandItem) => void }>(
   ({ items, command }, ref) => {
     const [selected, setSelected] = useState(0);
-    useEffect(() => setSelected(0), [items]);
+    const [prevItems, setPrevItems] = useState(items);
+    if (items !== prevItems) {
+      setPrevItems(items);
+      setSelected(0);
+    }
 
     const select = (index: number) => {
       const item = items[index];

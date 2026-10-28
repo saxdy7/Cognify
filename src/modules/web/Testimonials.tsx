@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Star, Quote, User } from 'lucide-react';
+import { Star, Quote } from 'lucide-react';
 import { BlurText } from '@/components/motion/blur-text';
 
 const testimonials = [
@@ -78,7 +78,7 @@ export const LandingTestimonials = () => {
 
                             {/* Content */}
                             <p className="text-lg text-zinc-300 font-medium leading-relaxed mb-8 relative z-10">
-                                "{testimonial.content}"
+                                &ldquo;{testimonial.content}&rdquo;
                             </p>
 
                             {/* Author */}

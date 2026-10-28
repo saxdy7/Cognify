@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -24,15 +24,13 @@ export function HyperText({
     animateOnHover = false,
 }: HyperTextProps) {
     const [displayText, setDisplayText] = useState(children);
-    const [isAnimating, setIsAnimating] = useState(false);
     const [hasAnimated, setHasAnimated] = useState(false);
     const elementRef = useRef<HTMLDivElement>(null);
     const frameRef = useRef<number | null>(null);
 
-    const scramble = () => {
+    const scramble = useCallback(() => {
         if (hasAnimated && !animateOnHover) return;
 
-        setIsAnimating(true);
         const startTime = Date.now();
         const originalText = children;
 
@@ -63,13 +61,12 @@ export function HyperText({
                 frameRef.current = requestAnimationFrame(animate);
             } else {
                 setDisplayText(originalText);
-                setIsAnimating(false);
                 setHasAnimated(true);
             }
         };
 
         frameRef.current = requestAnimationFrame(animate);
-    };
+    }, [children, duration, hasAnimated, animateOnHover]);
 
     useEffect(() => {
         return () => {
@@ -99,7 +96,7 @@ export function HyperText({
             observer.observe(elementRef.current);
             return () => observer.disconnect();
         }
-    }, [delay, startOnView, animateOnHover, hasAnimated]);
+    }, [delay, startOnView, animateOnHover, hasAnimated, scramble]);
 
     return (
         <motion.div

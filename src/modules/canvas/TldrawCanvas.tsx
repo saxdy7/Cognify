@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Tldraw, createShapeId, getSnapshot, loadSnapshot } from 'tldraw';
-import { ArrowLeft, Moon, Sun, CloudLightning, Loader2, Maximize, Minimize } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Loader2, Maximize, Minimize } from 'lucide-react';
 import { CanvasBoard } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -323,7 +323,7 @@ export function TldrawCanvas({ board, onBackToBoards, userId, theme, setTheme }:
         const filePath = fileName;
 
         // Upload to the public 'canvas-assets' Supabase Storage bucket
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
           .from('canvas-assets')
           .upload(filePath, file, {
             cacheControl: '3600',

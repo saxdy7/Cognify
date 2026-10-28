@@ -42,6 +42,7 @@ export interface CanvasBoard {
   is_dark_mode: boolean;
   parent_board_id?: string;
   tldraw_snapshot?: any;
+  template?: string;
   created_at: string;
   updated_at: string;
 }
@@ -79,7 +80,7 @@ export interface CanvasConnector {
   target_element_id: string;
   color: string;
   label?: string;
-  style: 'straight' | 'curved';
+  style: 'straight' | 'curved' | 'stepped';
   created_at: string;
 }
 

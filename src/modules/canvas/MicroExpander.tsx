@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Search, Bookmark, FolderPlus, Star, LayoutGrid, Zap } from 'lucide-react';
+import { Plus, X, Search, Bookmark, FolderPlus, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MicroExpanderProps {

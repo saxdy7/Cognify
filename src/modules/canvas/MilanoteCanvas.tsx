@@ -1,19 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ArrowLeft, Moon, Sun, Loader2, Maximize, Minimize, Plus, Minus,
-  StickyNote, Link as LinkIcon, CheckSquare, Spline, LayoutGrid, Columns,
-  MessageSquare, MoreHorizontal, Image as ImageIcon, Upload, Trash2,
-  MousePointer2, Type, Video, FileText, Frame, Pencil, Code2,
-  Clock, Timer, Grid3x3, Gauge,
+  Spline, LayoutGrid, Upload, Trash2,
 } from 'lucide-react';
 import { CanvasBoard, CanvasElement, CanvasConnector } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { CanvasCard } from './CanvasCards';
-import { ConnectorLine } from './ConnectorLine';
+import { ConnectorLine, computePreviewPath } from './ConnectorLine';
+import { BOARD_TEMPLATES } from './templates';
+import { FigmaCanvasToolbar, CanvasTool } from './FigmaCanvasToolbar';
 
 interface MilanoteCanvasProps {
   board: CanvasBoard;
@@ -21,9 +19,10 @@ interface MilanoteCanvasProps {
   userId: string;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
+  headerActions?: React.ReactNode;
 }
 
-type Tool = 'select' | 'connect' | 'delete';
+type Tool = CanvasTool;
 
 // Default geometry + content per element type
 const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; color: string; content: any }> = {
@@ -44,45 +43,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; color: s
   gauge: { width: 220, height: 270, color: '#FFFFFF', content: { label: 'Metric', value: 60, max: 100, unit: '%' } },
 };
 
-interface ToolbarItem {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-  type?: string;        // element type to create
-  action?: 'connect' | 'delete';
-  preset?: any;         // extra content merged in
-}
-
-const MAIN_TOOLS: ToolbarItem[] = [
-  { key: 'note', label: 'Note', icon: <StickyNote className="w-5 h-5" />, type: 'note' },
-  { key: 'link', label: 'Link', icon: <LinkIcon className="w-5 h-5" />, type: 'link' },
-  { key: 'todo', label: 'To-do', icon: <CheckSquare className="w-5 h-5" />, type: 'todo' },
-  { key: 'line', label: 'Line', icon: <Spline className="w-5 h-5" />, action: 'connect' },
-  { key: 'sketch', label: 'Draw', icon: <Pencil className="w-5 h-5" />, type: 'sketch' },
-  { key: 'board', label: 'Board', icon: <LayoutGrid className="w-5 h-5" />, type: 'board_link' },
-  { key: 'column', label: 'Column', icon: <Columns className="w-5 h-5" />, type: 'column' },
-  { key: 'comment', label: 'Comment', icon: <MessageSquare className="w-5 h-5" />, type: 'note', preset: { content: { title: 'Comment', body: '' }, color: '#DBEAFE' } },
-];
-
-const MORE_TOOLS: ToolbarItem[] = [
-  { key: 'heading', label: 'Heading', icon: <Type className="w-4 h-4" />, type: 'heading' },
-  { key: 'text', label: 'Text', icon: <Type className="w-4 h-4" />, type: 'text' },
-  { key: 'video', label: 'Video', icon: <Video className="w-4 h-4" />, type: 'link', preset: { width: 320, height: 200 } },
-  { key: 'document', label: 'Document', icon: <FileText className="w-4 h-4" />, type: 'file' },
-  { key: 'code', label: 'Code', icon: <Code2 className="w-4 h-4" />, type: 'code' },
-  { key: 'frame', label: 'Frame', icon: <Frame className="w-4 h-4" />, type: 'column' },
-  { key: 'clock', label: 'Clock', icon: <Clock className="w-4 h-4" />, type: 'clock' },
-  { key: 'countdown', label: 'Countdown', icon: <Timer className="w-4 h-4" />, type: 'countdown' },
-  { key: 'heatmap', label: 'Activity', icon: <Grid3x3 className="w-4 h-4" />, type: 'heatmap' },
-  { key: 'gauge', label: 'Gauge', icon: <Gauge className="w-4 h-4" />, type: 'gauge' },
-];
-
-const BOTTOM_TOOLS: ToolbarItem[] = [
-  { key: 'image', label: 'Add image', icon: <ImageIcon className="w-5 h-5" />, type: 'image' },
-  { key: 'upload', label: 'Upload', icon: <Upload className="w-5 h-5" />, type: 'file' },
-];
-
-export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme }: MilanoteCanvasProps) {
+export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme, headerActions }: MilanoteCanvasProps) {
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [connectors, setConnectors] = useState<CanvasConnector[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,18 +52,21 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   const [activeTool, setActiveTool] = useState<Tool>('select');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
-  const [showMore, setShowMore] = useState(false);
-  // The "More tools" popover is portaled to <body> (see render below) so it
-  // isn't clipped by the toolbar's overflow-y-auto — CSS forces overflow-x
-  // to clip too whenever overflow-y isn't visible, which was cutting it off.
-  const [morePos, setMorePos] = useState<{ top: number; left: number } | null>(null);
-  const moreButtonWrapRef = useRef<HTMLDivElement>(null);
+  const [connectPointer, setConnectPointer] = useState<{ x: number; y: number } | null>(null);
+  const [defaultLineStyle, setDefaultLineStyle] = useState<'curved' | 'straight' | 'stepped'>('curved');
 
   // Viewport (pan + zoom)
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Space-drag pan support
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const isSpacePressedRef = useRef(false);
+
+  // File upload input ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Refs so global paste/drop handlers always read the latest viewport
   const panRef = useRef(pan);
@@ -112,11 +76,14 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const handleFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreen);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreen);
+  }, []);
   const containerRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
 
-  // Brief eased transition for button-triggered zoom only — wheel-zoom and
-  // panning stay 1:1 with the input device, a transition there would lag.
   const [smoothZoom, setSmoothZoom] = useState(false);
   const smoothZoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerSmoothZoom = useCallback(() => {
@@ -131,78 +98,159 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   useEffect(() => { elementsRef.current = elements; }, [elements]);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // ─────────────────────────── Load board data ───────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [elRes, coRes] = await Promise.all([
-          supabase.from('canvas_elements').select('*').eq('board_id', board.id).order('created_at', { ascending: true }),
-          supabase.from('canvas_connectors').select('*').eq('board_id', board.id),
-        ]);
-        if (elRes.error) throw elRes.error;
-        if (coRes.error) throw coRes.error;
-        if (cancelled) return;
+  // ─────────────────────────── Template seeding ───────────────────────────
+  const seedTemplate = useCallback(async (templateId: string): Promise<CanvasElement[]> => {
+    const tmpl = BOARD_TEMPLATES.find(t => t.id === templateId);
+    if (!tmpl) return [];
+    try {
+      const rows = tmpl.elements.map(s => ({ board_id: board.id, ...s }));
+      const { data: insertedElements, error: elErr } = await supabase.from('canvas_elements').insert(rows).select();
+      if (elErr) throw elErr;
 
-        let loaded = elRes.data || [];
-        // Seed a template the first time an empty templated board is opened
-        if (loaded.length === 0 && board.tldraw_snapshot?.isNewTemplate) {
-          loaded = await seedTemplate(board.tldraw_snapshot.templateId);
+      const loadedElements = (insertedElements as CanvasElement[]) || [];
+
+      // Seed connectors from the template if present
+      if (tmpl.connectors && tmpl.connectors.length > 0 && loadedElements.length > 0) {
+        const connectorRows = tmpl.connectors.map(c => {
+          const src = loadedElements[c.sourceIndex];
+          const tgt = loadedElements[c.targetIndex];
+          if (!src || !tgt) return null;
+          return {
+            board_id: board.id,
+            source_element_id: src.id,
+            target_element_id: tgt.id,
+            color: c.color || '#5B6CF9',
+            style: 'curved' as const,
+          };
+        }).filter(Boolean);
+
+        if (connectorRows.length > 0) {
+          const { data: insertedConnectors, error: connErr } = await supabase
+            .from('canvas_connectors')
+            .insert(connectorRows)
+            .select();
+          if (!connErr && insertedConnectors) {
+            setConnectors(insertedConnectors as CanvasConnector[]);
+          }
         }
-        setElements(loaded);
-        setConnectors(coRes.data || []);
-      } catch (err: any) {
-        console.error('Error loading canvas:', err);
-        toast.error('Failed to load canvas: ' + (err.message || 'unknown error'));
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    };
-    load();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+      return loadedElements;
+    } catch (err) {
+      console.error('Template seed failed:', err);
+      toast.error('Failed to load template');
+      return [];
+    }
   }, [board.id]);
 
-  // Fullscreen sync
+  // ─────────────────────────── Initial load + Realtime ───────────────────────────
   useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+    let mounted = true;
 
-  // Clean up pending timers on unmount
-  useEffect(() => {
-    const timers = saveTimers.current;
-    return () => { Object.values(timers).forEach(clearTimeout); };
-  }, []);
+    async function loadData() {
+      try {
+        const [{ data: elData, error: elErr }, { data: connData, error: connErr }] = await Promise.all([
+          supabase.from('canvas_elements').select('*').eq('board_id', board.id),
+          supabase.from('canvas_connectors').select('*').eq('board_id', board.id),
+        ]);
 
-  // ─────────────────────────── Persistence ───────────────────────────
-  const persistUpdate = useCallback((id: string, immediate = false) => {
+        if (elErr) throw elErr;
+        if (!mounted) return;
+
+        let loadedElements = (elData as CanvasElement[]) || [];
+
+        // Seed template if board is brand new and specifies a template
+        if (loadedElements.length === 0 && board.template && board.template !== 'blank') {
+          loadedElements = await seedTemplate(board.template);
+        }
+
+        setElements(loadedElements);
+        if (!connErr && connData) {
+          setConnectors(connData as CanvasConnector[]);
+        }
+      } catch (err) {
+        console.error('Canvas load failed:', err);
+        toast.error('Failed to load canvas data');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadData();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel(`canvas_${board.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_elements', filter: `board_id=eq.${board.id}` }, payload => {
+        if (!mounted) return;
+        if (payload.eventType === 'INSERT') {
+          const newEl = payload.new as CanvasElement;
+          setElements(prev => (prev.some(e => e.id === newEl.id) ? prev : [...prev, newEl]));
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as CanvasElement;
+          setElements(prev => prev.map(e => (e.id === updated.id ? updated : e)));
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = payload.old.id;
+          setElements(prev => prev.filter(e => e.id !== oldId));
+          setConnectors(prev => prev.filter(c => c.source_element_id !== oldId && c.target_element_id !== oldId));
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_connectors', filter: `board_id=eq.${board.id}` }, payload => {
+        if (!mounted) return;
+        if (payload.eventType === 'INSERT') {
+          const newC = payload.new as CanvasConnector;
+          setConnectors(prev => (prev.some(c => c.id === newC.id) ? prev : [...prev, newC]));
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as CanvasConnector;
+          setConnectors(prev => prev.map(c => (c.id === updated.id ? updated : c)));
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = payload.old.id;
+          setConnectors(prev => prev.filter(c => c.id !== oldId));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [board.id, board.template, seedTemplate]);
+
+  // ─────────────────────────── Auto-save ───────────────────────────
+  const persistUpdate = useCallback(async (id: string) => {
+    if (id.startsWith('temp-')) return;
+    const el = elementsRef.current.find(e => e.id === id);
+    if (!el) return;
+
     if (saveTimers.current[id]) clearTimeout(saveTimers.current[id]);
-    const run = async () => {
-      const el = elementsRef.current.find(e => e.id === id);
-      if (!el) return;
-      setSavingStatus('saving');
+    setSavingStatus('saving');
+
+    saveTimers.current[id] = setTimeout(async () => {
       try {
         const { error } = await supabase
           .from('canvas_elements')
           .update({
-            x: el.x, y: el.y, width: el.width, height: el.height,
-            color: el.color, content: el.content, updated_at: new Date().toISOString(),
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            color: el.color,
+            content: el.content,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', id);
+
         if (error) throw error;
         setSavingStatus('synced');
       } catch (err) {
         console.error('Save failed:', err);
         setSavingStatus('error');
+        toast.error('Failed to save changes');
       }
-    };
-    if (immediate) run();
-    else saveTimers.current[id] = setTimeout(run, 700);
+    }, 400);
   }, []);
 
+  // ─────────────────────────── Canvas math ───────────────────────────
   const screenToCanvasCenter = useCallback(() => {
     const rect = surfaceRef.current?.getBoundingClientRect();
     if (!rect) return { x: 200, y: 200 };
@@ -212,7 +260,6 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
     };
   }, []);
 
-  // Convert a screen (clientX/Y) point into canvas coordinates
   const screenToCanvas = useCallback((clientX: number, clientY: number) => {
     const rect = surfaceRef.current?.getBoundingClientRect();
     if (!rect) return screenToCanvasCenter();
@@ -245,7 +292,6 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
       content,
     };
 
-    // Optimistic temp element
     const tempId = 'temp-' + Math.random().toString(36).slice(2);
     const optimistic = { ...row, id: tempId, created_at: '', updated_at: '' } as CanvasElement;
     setElements(prev => [...prev, optimistic]);
@@ -287,6 +333,10 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
     setElements(prev => prev.filter(e => e.id !== id));
     setConnectors(prev => prev.filter(c => c.source_element_id !== id && c.target_element_id !== id));
     if (selectedId === id) setSelectedId(null);
+    if (connectSourceId === id) {
+      setConnectSourceId(null);
+      setConnectPointer(null);
+    }
     if (id.startsWith('temp-')) return;
     try {
       await supabase.from('canvas_elements').delete().eq('id', id);
@@ -294,10 +344,9 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
       console.error('Delete failed:', err);
       toast.error('Failed to delete card');
     }
-  }, [selectedId]);
+  }, [selectedId, connectSourceId]);
 
-  // ─────────────────────────── Paste / Drop (images, links, text, files) ───────────────────────────
-  // Upload an image/video to Supabase storage; fall back to an inline base64 data URL
+  // ─────────────────────────── Upload Media ───────────────────────────
   const uploadMedia = useCallback(async (file: File): Promise<string> => {
     try {
       const ext = file.name.split('.').pop() || 'png';
@@ -307,7 +356,6 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
       const { data: { publicUrl } } = supabase.storage.from('canvas-assets').getPublicUrl(path);
       return publicUrl;
     } catch {
-      // Storage bucket missing / blocked → embed as base64 so it still works
       return await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -331,7 +379,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
       await addElement('image', preset, at);
       toast.success('Added to canvas', { id: tid });
     } catch (err) {
-      console.error('Image paste/drop failed:', err);
+      console.error('Image upload failed:', err);
       toast.error('Failed to add media', { id: tid });
     }
   }, [uploadMedia, addElement]);
@@ -348,153 +396,212 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   }, [addElement]);
 
   const createLinkFromUrl = useCallback(async (url: string, at?: { x: number; y: number }) => {
-    let hostname = 'link';
-    try { hostname = new URL(url).hostname.replace(/^www\./, ''); } catch { /* keep default */ }
-    const baseContent = {
-      url,
-      title: hostname,
-      description: '',
-      image: '',
-      favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
-    };
-    const el = await addElement('link', { width: 300, height: 220, content: baseContent }, at);
-    if (!el) return;
-    // Enrich with real metadata (title / preview image). Harmless for video links — the card embeds those directly.
-    try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        handleUpdate(el.id, {
-          content: {
-            url,
-            title: d.title || hostname,
-            description: d.description || '',
-            image: d.preview_image_url || '',
-            favicon: d.logo_url || baseContent.favicon,
-          },
-        });
-      }
-    } catch { /* metadata is best-effort */ }
-  }, [addElement, handleUpdate]);
-
-  const createNoteFromText = useCallback(async (text: string, at?: { x: number; y: number }) => {
-    await addElement('note', { content: { title: '', body: text } }, at);
+    let hostname = 'website.com';
+    try { hostname = new URL(url).hostname; } catch {}
+    await addElement('link', {
+      content: {
+        url,
+        title: hostname,
+        description: 'Linked resource added to canvas.',
+        favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`,
+      },
+    }, at);
+    toast.success('Added link to canvas');
   }, [addElement]);
 
-  // Global paste handler
+  // File input change handler
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const center = screenToCanvasCenter();
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const offsetAt = {
+        x: Math.round(center.x + (i - (files.length - 1) / 2) * 50),
+        y: Math.round(center.y + (i - (files.length - 1) / 2) * 50),
+      };
+      if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+        await createImageFromFile(file, offsetAt);
+      } else {
+        await createFileFromFile(file, offsetAt);
+      }
+    }
+    e.target.value = '';
+  };
+
+  // Paste handler
   useEffect(() => {
     const onPaste = async (e: ClipboardEvent) => {
-      const cd = e.clipboardData;
-      if (!cd) return;
-
-      // 1) Image from clipboard (screenshots, copied images)
-      const imageItem = Array.from(cd.items || []).find(i => i.type.startsWith('image/'));
-      const fileImage = Array.from(cd.files || []).find(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-      const at = lastPointerRef.current || undefined;
-
-      if (imageItem) {
-        const file = imageItem.getAsFile();
-        if (file) { e.preventDefault(); await createImageFromFile(file, at); return; }
-      }
-      if (fileImage) { e.preventDefault(); await createImageFromFile(fileImage, at); return; }
-
-      // 2) Text / URL — but don't hijack paste while editing a card field
       const active = document.activeElement as HTMLElement | null;
-      const editing = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
-      if (editing) return;
+      const isInput = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (isInput) return;
 
-      const text = (cd.getData('text/plain') || '').trim();
-      if (!text) return;
-      e.preventDefault();
-      if (/^https?:\/\/\S+$/i.test(text)) await createLinkFromUrl(text, at);
-      else await createNoteFromText(text, at);
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file' && (item.type.startsWith('image/') || item.type.startsWith('video/'))) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            createImageFromFile(file, lastPointerRef.current || undefined);
+            return;
+          }
+        }
+      }
+
+      const text = e.clipboardData?.getData('text')?.trim();
+      if (text) {
+        if (/^https?:\/\//i.test(text)) {
+          e.preventDefault();
+          createLinkFromUrl(text, lastPointerRef.current || undefined);
+          return;
+        }
+        if (text.length > 0) {
+          e.preventDefault();
+          if (text.length > 120 || text.includes('\n')) {
+            addElement('note', { content: { title: '', body: text } }, lastPointerRef.current || undefined);
+          } else {
+            addElement('text', { content: { text } }, lastPointerRef.current || undefined);
+          }
+        }
+      }
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [createImageFromFile, createLinkFromUrl, createNoteFromText]);
+  }, [createImageFromFile, createLinkFromUrl, addElement]);
 
-  // Drag & drop onto the surface
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const at = screenToCanvas(e.clientX, e.clientY);
-    const files = Array.from(e.dataTransfer.files || []);
-    if (files.length) {
-      let i = 0;
-      for (const f of files) {
-        const spot = { x: at.x + i * 24, y: at.y + i * 24 };
-        if (f.type.startsWith('image/') || f.type.startsWith('video/')) await createImageFromFile(f, spot);
-        else await createFileFromFile(f, spot);
-        i++;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      for (const file of files) {
+        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+          await createImageFromFile(file, at);
+        } else {
+          await createFileFromFile(file, at);
+        }
       }
       return;
     }
-    const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-    if (url && /^https?:\/\/\S+$/i.test(url.trim())) await createLinkFromUrl(url.trim(), at);
-    else if (url) await createNoteFromText(url.trim(), at);
-  }, [screenToCanvas, createImageFromFile, createFileFromFile, createLinkFromUrl, createNoteFromText]);
 
-  // ─────────────────────────── Connectors ───────────────────────────
+    const text = e.dataTransfer.getData('text')?.trim();
+    if (text) {
+      if (/^https?:\/\//i.test(text)) {
+        await createLinkFromUrl(text, at);
+      } else {
+        await addElement('note', { content: { title: '', body: text } }, at);
+      }
+    }
+  }, [screenToCanvas, createImageFromFile, createFileFromFile, createLinkFromUrl, addElement]);
+
+  // ─────────────────────────── Connectors (Sigmoid Curves) ───────────────────────────
   const createConnector = useCallback(async (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
     const exists = connectors.some(
       c => (c.source_element_id === sourceId && c.target_element_id === targetId) ||
            (c.source_element_id === targetId && c.target_element_id === sourceId)
     );
-    if (exists) { toast.info('These cards are already connected'); return; }
+    if (exists) {
+      toast.info('These cards are already connected');
+      return;
+    }
 
     const row = {
       board_id: board.id,
       source_element_id: sourceId,
       target_element_id: targetId,
       color: '#5B6CF9',
-      style: 'curved',
+      style: defaultLineStyle,
     };
+
+    const tempId = 'temp-' + Math.random().toString(36).slice(2);
+    const optimistic: CanvasConnector = {
+      ...row,
+      id: tempId,
+      created_at: new Date().toISOString(),
+    };
+
+    setConnectors(prev => [...prev, optimistic]);
+
     try {
       const { data, error } = await supabase.from('canvas_connectors').insert([row]).select().single();
       if (error) throw error;
-      setConnectors(prev => [...prev, data as CanvasConnector]);
+      setConnectors(prev => prev.map(c => (c.id === tempId ? (data as CanvasConnector) : c)));
+      toast.success('Cards connected with smooth curve');
     } catch (err: any) {
       console.error('Connector create failed:', err);
       toast.error('Failed to create line: ' + (err.message || 'unknown error'));
+      setConnectors(prev => prev.filter(c => c.id !== tempId));
     }
-  }, [board.id, connectors]);
+  }, [board.id, connectors, defaultLineStyle]);
 
-  const deleteConnector = useCallback(async (id: string) => {
-    setConnectors(prev => prev.filter(c => c.id !== id));
+  const updateConnector = useCallback(async (id: string, updates: Partial<CanvasConnector>) => {
+    setConnectors(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)));
     try {
-      await supabase.from('canvas_connectors').delete().eq('id', id);
-    } catch (err) {
-      console.error('Connector delete failed:', err);
+      const { error } = await supabase.from('canvas_connectors').update(updates).eq('id', id);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('Connector update failed:', err);
+      toast.error('Failed to update line');
     }
   }, []);
 
-  // Card click — behavior depends on the active tool
+  const deleteConnector = useCallback(async (id: string) => {
+    const toDelete = connectors.find(c => c.id === id);
+    setConnectors(prev => prev.filter(c => c.id !== id));
+    try {
+      const { error } = await supabase.from('canvas_connectors').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Connector delete failed:', err);
+      toast.error('Failed to delete line');
+      if (toDelete) setConnectors(prev => [...prev, toDelete]);
+    }
+  }, [connectors]);
+
+  // Card click — behavior depends on activeTool
   const handleCardClick = useCallback((id: string) => {
-    if (activeTool === 'delete') { handleDelete(id); return; }
+    if (activeTool === 'delete') {
+      handleDelete(id);
+      return;
+    }
     if (activeTool === 'connect') {
       if (!connectSourceId) {
         setConnectSourceId(id);
-        toast.info('Now click a second card to connect');
+        toast.info('Click destination card to connect');
+      } else if (connectSourceId === id) {
+        setConnectSourceId(null);
+        setConnectPointer(null);
+        toast.info('Connection cancelled');
       } else {
         createConnector(connectSourceId, id);
         setConnectSourceId(null);
+        setConnectPointer(null);
       }
       return;
     }
     setSelectedId(id);
   }, [activeTool, connectSourceId, handleDelete, createConnector]);
 
-  // Keyboard shortcuts: Delete/Backspace removes the selected card,
-  // Escape clears selection and drops back to the select tool.
+  // ─────────────────────────── Keyboard shortcuts ───────────────────────────
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null;
       const editing = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+
+      // Space key for temporary hand pan
+      if (e.code === 'Space' && !editing) {
+        if (!isSpacePressedRef.current) {
+          isSpacePressedRef.current = true;
+          setIsSpacePressed(true);
+        }
+      }
+
       if (editing) return;
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
@@ -505,126 +612,144 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
       if (e.key === 'Escape') {
         setSelectedId(null);
         setConnectSourceId(null);
-        setShowMore(false);
+        setConnectPointer(null);
         setActiveTool('select');
+        return;
+      }
+
+      // Quick tool shortcuts
+      const k = e.key.toLowerCase();
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (k === 'v') setActiveTool('select');
+        else if (k === 'h') setActiveTool('hand');
+        else if (k === 'f') addElement('column');
+        else if (k === 'n' || k === 'r') addElement('note');
+        else if (k === 't') addElement('text');
+        else if (k === 'p' || k === 'l') setActiveTool(t => (t === 'connect' ? 'select' : 'connect'));
+        else if (k === 'c') addElement('note', { content: { title: 'Comment', body: '' }, color: '#DBEAFE' });
+        else if (k === 'd') addElement('sketch');
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedId, handleDelete]);
 
-  // ─────────────────────────── Pan & Zoom ───────────────────────────
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = false;
+        setIsSpacePressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [selectedId, handleDelete, addElement]);
+
+  // ─────────────────────────── Non-passive Wheel Listener (Zoom Isolation) ───────────────────────────
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+
+    const onWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement | null;
+      // Allow internal scrolling inside textareas / code editors only when NOT zooming
+      if (target?.closest('textarea, [contenteditable="true"], .overflow-y-auto')) {
+        if (!e.ctrlKey && !e.metaKey) {
+          return;
+        }
+      }
+
+      // Non-passive preventDefault() strictly prevents native full-page browser zoom
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.ctrlKey || e.metaKey) {
+        // Trackpad pinch or Ctrl + Mouse Wheel -> Canvas Zoom
+        const zoomFactor = e.deltaY < 0 ? 1.06 : 0.94;
+        const currentZoom = zoomRef.current;
+        const newZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.2), 3);
+
+        const rect = surface.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        setPan(prev => ({
+          x: Math.round(cursorX - (cursorX - prev.x) * (newZoom / currentZoom)),
+          y: Math.round(cursorY - (cursorY - prev.y) * (newZoom / currentZoom)),
+        }));
+        setZoom(newZoom);
+      } else {
+        // Trackpad 2-finger scroll or standard mouse wheel -> Canvas Pan
+        setPan(prev => ({
+          x: Math.round(prev.x - e.deltaX),
+          y: Math.round(prev.y - e.deltaY),
+        }));
+      }
+    };
+
+    surface.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      surface.removeEventListener('wheel', onWheel);
+    };
+  }, []);
+
+  // ─────────────────────────── Pan Surface Mouse Drag ───────────────────────────
   const handleSurfaceMouseDown = useCallback((e: React.MouseEvent) => {
-    // Ignore clicks that originate inside a card
-    if ((e.target as HTMLElement).closest('[data-card="true"]')) return;
+    // If not holding space / hand tool, don't pan if clicking directly on a card
+    if (!isSpacePressedRef.current && activeTool !== 'hand') {
+      if ((e.target as HTMLElement).closest('[data-card="true"]')) return;
+    }
 
     setSelectedId(null);
-    if (activeTool === 'connect') { setConnectSourceId(null); }
-
-    // Begin panning (left button on empty space, or middle button anywhere)
-    if (e.button === 1 || activeTool === 'select') {
-      setIsPanning(true);
-      const start = { x: e.clientX, y: e.clientY };
-      const startPan = { ...pan };
-      const move = (me: MouseEvent) => {
-        setPan({ x: startPan.x + (me.clientX - start.x), y: startPan.y + (me.clientY - start.y) });
-      };
-      const up = () => {
-        setIsPanning(false);
-        window.removeEventListener('mousemove', move);
-        window.removeEventListener('mouseup', up);
-      };
-      window.addEventListener('mousemove', move);
-      window.addEventListener('mouseup', up);
+    if (connectSourceId) {
+      setConnectSourceId(null);
+      setConnectPointer(null);
     }
-  }, [activeTool, pan]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      // Zoom toward cursor
-      const rect = surfaceRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const factor = e.deltaY < 0 ? 1.1 : 0.9;
-      const newZoom = Math.min(3, Math.max(0.2, zoom * factor));
-      // keep the point under the cursor stationary
-      const worldX = (cx - pan.x) / zoom;
-      const worldY = (cy - pan.y) / zoom;
-      setPan({ x: cx - worldX * newZoom, y: cy - worldY * newZoom });
-      setZoom(newZoom);
-    } else {
-      setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
-    }
-  }, [pan, zoom]);
+    if (e.button !== 0 && e.button !== 1) return;
+    setIsPanning(true);
+
+    const startX = e.clientX - panRef.current.x;
+    const startY = e.clientY - panRef.current.y;
+
+    const onMove = (moveEvt: MouseEvent) => {
+      setPan({
+        x: Math.round(moveEvt.clientX - startX),
+        y: Math.round(moveEvt.clientY - startY),
+      });
+    };
+
+    const onUp = () => {
+      setIsPanning(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [connectSourceId, activeTool]);
 
   const zoomBy = (factor: number) => {
-    const rect = surfaceRef.current?.getBoundingClientRect();
-    const cx = rect ? rect.width / 2 : 0;
-    const cy = rect ? rect.height / 2 : 0;
-    const newZoom = Math.min(3, Math.max(0.2, zoom * factor));
-    const worldX = (cx - pan.x) / zoom;
-    const worldY = (cy - pan.y) / zoom;
     triggerSmoothZoom();
-    setPan({ x: cx - worldX * newZoom, y: cy - worldY * newZoom });
-    setZoom(newZoom);
+    const rect = surfaceRef.current?.getBoundingClientRect();
+    const cx = rect ? rect.width / 2 : 400;
+    const cy = rect ? rect.height / 2 : 300;
+
+    setZoom(prev => {
+      const next = Math.min(Math.max(prev * factor, 0.2), 3);
+      setPan(p => ({
+        x: Math.round(cx - (cx - p.x) * (next / prev)),
+        y: Math.round(cy - (cy - p.y) * (next / prev)),
+      }));
+      return next;
+    });
   };
 
-  const resetView = () => { triggerSmoothZoom(); setZoom(1); setPan({ x: 0, y: 0 }); };
-
-  // ─────────────────────────── Toolbar handler ───────────────────────────
-  const handleToolClick = (item: ToolbarItem) => {
-    setShowMore(false);
-    if (item.action === 'connect') {
-      setActiveTool(t => (t === 'connect' ? 'select' : 'connect'));
-      setConnectSourceId(null);
-      return;
-    }
-    if (item.type) {
-      setActiveTool('select');
-      addElement(item.type, item.preset);
-    }
-  };
-
-  // ─────────────────────────── Template seeding ───────────────────────────
-  const seedTemplate = async (templateId: string): Promise<CanvasElement[]> => {
-    const T: Record<string, any[]> = {
-      moodboard: [
-        { type: 'text', x: 100, y: 60, width: 320, height: 60, color: '#FFFFFF', content: { text: 'Creative Moodboard' } },
-        { type: 'note', x: 100, y: 150, width: 260, height: 200, color: '#FFEDD5', content: { title: 'Brand Theme', body: 'Modern typography, warm pastel colors, glassmorphism UI.' } },
-        { type: 'image', x: 400, y: 150, width: 320, height: 240, color: '#FFFFFF', content: { src: '' } },
-        { type: 'link', x: 100, y: 380, width: 280, height: 200, color: '#FFFFFF', content: { url: '' } },
-      ],
-      kanban: [
-        { type: 'column', x: 80, y: 80, width: 300, height: 460, color: '#FFFFFF', content: { title: 'To Do' } },
-        { type: 'column', x: 410, y: 80, width: 300, height: 460, color: '#FFFFFF', content: { title: 'In Progress' } },
-        { type: 'column', x: 740, y: 80, width: 300, height: 460, color: '#FFFFFF', content: { title: 'Completed' } },
-        { type: 'todo', x: 110, y: 160, width: 240, height: 220, color: '#FFFFFF', content: { title: 'Launch Checklist', tasks: [{ id: '1', text: 'Define branding', completed: true }, { id: '2', text: 'Configure Supabase', completed: false }] } },
-      ],
-      retro: [
-        { type: 'column', x: 80, y: 80, width: 300, height: 460, color: '#FFFFFF', content: { title: 'What Went Well' } },
-        { type: 'column', x: 410, y: 80, width: 300, height: 460, color: '#FFFFFF', content: { title: 'What to Improve' } },
-        { type: 'column', x: 740, y: 80, width: 300, height: 460, color: '#FFFFFF', content: { title: 'Action Items' } },
-        { type: 'note', x: 110, y: 160, width: 240, height: 120, color: '#DCFCE7', content: { title: 'Great velocity', body: 'Features completed ahead of schedule' } },
-        { type: 'note', x: 440, y: 160, width: 240, height: 120, color: '#FEE2E2', content: { title: 'Test coverage', body: 'Missing edge case validation' } },
-      ],
-      brainstorm: [
-        { type: 'note', x: 450, y: 280, width: 260, height: 140, color: '#F3E8FF', content: { title: 'Core Concept', body: 'Evolving Cognify into a visual hub.' } },
-        { type: 'note', x: 130, y: 120, width: 240, height: 120, color: '#DBEAFE', content: { title: 'Feature: Docs', body: 'Block-based editor for notes and pages.' } },
-        { type: 'note', x: 780, y: 120, width: 240, height: 120, color: '#FEF9C3', content: { title: 'Feature: Canvas', body: 'Visual boards with connectors.' } },
-      ],
-    };
-    const seeds = T[templateId];
-    if (!seeds) return [];
-    try {
-      const rows = seeds.map(s => ({ board_id: board.id, ...s }));
-      const { data, error } = await supabase.from('canvas_elements').insert(rows).select();
-      if (error) throw error;
-      return (data as CanvasElement[]) || [];
-    } catch (err) {
-      console.error('Template seed failed:', err);
-      return [];
-    }
+  const resetView = () => {
+    triggerSmoothZoom();
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
   };
 
   const toggleFullscreen = () => {
@@ -633,6 +758,11 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
   };
 
   const dark = theme === 'dark';
+
+  const sourceCard = connectSourceId ? elements.find(e => e.id === connectSourceId) : null;
+  const sourceCardTitle = sourceCard
+    ? (sourceCard.content?.title || sourceCard.content?.text || sourceCard.content?.label || sourceCard.type)
+    : '';
 
   // ─────────────────────────── Render ───────────────────────────
   if (loading) {
@@ -648,7 +778,18 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
     <div
       ref={containerRef}
       className={`w-full h-full relative overflow-hidden flex flex-col transition-colors duration-300 ${dark ? 'bg-zinc-950 text-zinc-100' : 'bg-[#f4f4f2] text-zinc-900'}`}
+      style={{ touchAction: 'none', overscrollBehavior: 'none' }}
     >
+      {/* Hidden file input for uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*,.pdf,.txt,.doc,.docx"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
       {/* Top bar */}
       <div className={`w-full h-14 px-4 flex items-center justify-between border-b shrink-0 select-none z-[120] ${dark ? 'bg-zinc-950/90 border-zinc-800/80' : 'bg-white/90 border-zinc-200/80'} backdrop-blur-md`}>
         <div className="flex items-center gap-3">
@@ -668,105 +809,91 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Zoom controls */}
-          <div className={`flex items-center gap-0.5 p-0.5 border rounded-xl ${dark ? 'bg-zinc-900/80 border-white/10' : 'bg-white border-zinc-200 shadow-sm'}`}>
-            <button onClick={() => zoomBy(0.9)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors" title="Zoom out"><Minus className="w-3.5 h-3.5" /></button>
-            <button onClick={resetView} className="px-2 text-[10px] font-black tabular-nums w-12 text-center" title="Reset view">{Math.round(zoom * 100)}%</button>
-            <button onClick={() => zoomBy(1.1)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors" title="Zoom in"><Plus className="w-3.5 h-3.5" /></button>
+        <div className="flex items-center gap-3">
+          {/* Share button pulled to the left side with distinct separation */}
+          {headerActions && (
+            <div className="flex items-center gap-3">
+              {headerActions}
+              <div className={`h-4 w-px ${dark ? 'bg-zinc-800' : 'bg-zinc-300'}`} />
+            </div>
+          )}
+
+          {/* Zoom controls: fully visible [- 100% +] */}
+          <div className={`flex items-center gap-1 px-1.5 py-1 border rounded-xl shadow-xs select-none ${dark ? 'bg-zinc-900/90 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
+            <button
+              onClick={() => zoomBy(0.9)}
+              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${dark ? 'hover:bg-white/10 text-zinc-200 hover:text-white' : 'hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900'}`}
+              title="Zoom out (-)"
+              aria-label="Zoom out"
+            >
+              <Minus className="w-4 h-4 stroke-[2.5]" />
+            </button>
+            <button
+              onClick={resetView}
+              className={`px-2.5 py-0.5 text-xs font-black tabular-nums min-w-[52px] text-center rounded-md transition-colors cursor-pointer ${dark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-100 text-zinc-900'}`}
+              title="Reset zoom to 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => zoomBy(1.1)}
+              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${dark ? 'hover:bg-white/10 text-zinc-200 hover:text-white' : 'hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900'}`}
+              title="Zoom in (+)"
+              aria-label="Zoom in"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+            </button>
           </div>
-          <button onClick={toggleFullscreen} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Fullscreen">
+
+          <div className={`h-4 w-px ${dark ? 'bg-zinc-800' : 'bg-zinc-300'}`} />
+
+          <button onClick={toggleFullscreen} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 cursor-pointer ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Fullscreen">
             {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={() => setTheme(dark ? 'light' : 'dark')} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Toggle theme">
+          <button onClick={() => setTheme(dark ? 'light' : 'dark')} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 cursor-pointer ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Toggle theme">
             {dark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-blue-500" />}
           </button>
         </div>
       </div>
 
-      {/* Canvas body */}
-      <div className="flex-1 relative min-h-0 flex">
-        {/* Left toolbar */}
-        <div className={`relative z-[110] w-[72px] shrink-0 border-r flex flex-col items-center py-3 gap-1 overflow-y-auto ${dark ? 'bg-zinc-950/95 border-zinc-800/80' : 'bg-white/95 border-zinc-200/80'} backdrop-blur-md`}>
-          <ToolbarButton dark={dark} active={activeTool === 'select'} label="Select" onClick={() => { setActiveTool('select'); setConnectSourceId(null); }}>
-            <MousePointer2 className="w-5 h-5" />
-          </ToolbarButton>
-          <div className={`w-8 h-px my-1 ${dark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-
-          {MAIN_TOOLS.map(item => (
-            <ToolbarButton key={item.key} dark={dark} active={item.action === 'connect' && activeTool === 'connect'} label={item.label} onClick={() => handleToolClick(item)}>
-              {item.icon}
-            </ToolbarButton>
-          ))}
-
-          {/* More popover — portaled to <body>, positioned from the button's rect */}
-          <div ref={moreButtonWrapRef} className="relative">
-            <ToolbarButton
-              dark={dark}
-              active={showMore}
-              label="More"
-              onClick={() => {
-                if (!showMore) {
-                  const rect = moreButtonWrapRef.current?.getBoundingClientRect();
-                  if (rect) setMorePos({ top: rect.top, left: rect.right + 8 });
-                }
-                setShowMore(s => !s);
-              }}
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </ToolbarButton>
-          </div>
-          {showMore && morePos && createPortal(
-            <>
-              <div className="fixed inset-0 z-[129]" onClick={() => setShowMore(false)} />
-              <div
-                className={`fixed z-[130] grid grid-cols-2 gap-1 p-2 rounded-2xl shadow-2xl border animate-popover-in ${dark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'}`}
-                style={{ top: morePos.top, left: morePos.left, width: 200 }}
-              >
-                {MORE_TOOLS.map(item => (
-                  <button key={item.key} onClick={() => handleToolClick(item)}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors ${dark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'}`}>
-                    {item.icon}
-                    <span className="text-[10px] font-bold">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </>,
-            document.body
-          )}
-
-          <div className={`w-8 h-px my-1 ${dark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-          {BOTTOM_TOOLS.map(item => (
-            <ToolbarButton key={item.key} dark={dark} label={item.label} onClick={() => handleToolClick(item)}>
-              {item.icon}
-            </ToolbarButton>
-          ))}
-
-          <div className="mt-auto" />
-          <ToolbarButton dark={dark} active={activeTool === 'delete'} label="Delete" danger onClick={() => { setActiveTool(t => (t === 'delete' ? 'select' : 'delete')); setConnectSourceId(null); }}>
-            <Trash2 className="w-5 h-5" />
-          </ToolbarButton>
-        </div>
-
+      {/* Canvas body: Full edge-to-edge workspace */}
+      <div className="flex-1 relative min-h-0 w-full h-full flex overflow-hidden">
         {/* Infinite surface */}
         <div
           ref={surfaceRef}
           onMouseDown={handleSurfaceMouseDown}
-          onMouseMove={(e) => { lastPointerRef.current = screenToCanvas(e.clientX, e.clientY); }}
+          onMouseMove={(e) => {
+            const canvasPos = screenToCanvas(e.clientX, e.clientY);
+            lastPointerRef.current = canvasPos;
+            if (activeTool === 'connect' && connectSourceId) {
+              setConnectPointer(canvasPos);
+            }
+          }}
           onDoubleClick={(e) => {
             if ((e.target as HTMLElement).closest('[data-card="true"]')) return;
             if (activeTool !== 'select') return;
             addElement('note', undefined, screenToCanvas(e.clientX, e.clientY));
           }}
-          onWheel={handleWheel}
           onDrop={handleDrop}
           onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
           onDragLeave={(e) => { if (e.currentTarget === e.target) setIsDragOver(false); }}
-          className={`relative flex-1 overflow-hidden ${activeTool === 'connect' ? 'cursor-crosshair' : activeTool === 'delete' ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`relative flex-1 w-full h-full overflow-hidden select-none ${
+            activeTool === 'connect'
+              ? 'cursor-crosshair'
+              : activeTool === 'delete'
+              ? 'cursor-crosshair'
+              : activeTool === 'hand' || isSpacePressed
+              ? isPanning ? 'cursor-grabbing' : 'cursor-grab'
+              : isPanning
+              ? 'cursor-grabbing'
+              : 'cursor-default'
+          }`}
           style={{
             backgroundImage: `radial-gradient(circle, ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'} 1px, transparent 1px)`,
             backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
             backgroundPosition: `${pan.x}px ${pan.y}px`,
+            touchAction: 'none',
+            overscrollBehavior: 'none',
           }}
         >
           {/* Transformed content layer */}
@@ -776,14 +903,57 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
           >
             {/* Connectors (behind cards) */}
             <svg className="absolute top-0 left-0 overflow-visible pointer-events-none" style={{ width: 1, height: 1, zIndex: 1 }}>
+              <defs>
+                <marker
+                  id="preview-arrowhead"
+                  viewBox="0 0 10 10"
+                  refX="7"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#6366F1" />
+                </marker>
+              </defs>
+
               {connectors.map(c => {
                 const source = elements.find(e => e.id === c.source_element_id);
                 const target = elements.find(e => e.id === c.target_element_id);
                 if (!source || !target) return null;
                 return (
-                  <ConnectorLine key={c.id} connector={c} source={source} target={target} onDelete={() => deleteConnector(c.id)} />
+                  <ConnectorLine
+                    key={c.id}
+                    connector={c}
+                    source={source}
+                    target={target}
+                    onDelete={() => deleteConnector(c.id)}
+                    onUpdate={(updates) => updateConnector(c.id, updates)}
+                  />
                 );
               })}
+
+              {/* Live interactive sigmoid preview line while connecting */}
+              {activeTool === 'connect' && connectSourceId && connectPointer && (() => {
+                const sourceEl = elements.find(e => e.id === connectSourceId);
+                if (!sourceEl) return null;
+                const preview = computePreviewPath(sourceEl, connectPointer, defaultLineStyle);
+                return (
+                  <g className="pointer-events-none">
+                    <circle cx={preview.start.x} cy={preview.start.y} r="4" fill="#6366F1" />
+                    <path
+                      d={preview.pathD}
+                      fill="none"
+                      stroke="#6366F1"
+                      strokeWidth="2.5"
+                      strokeDasharray="6 4"
+                      className="animate-pulse"
+                      markerEnd="url(#preview-arrowhead)"
+                    />
+                    <circle cx={preview.end.x} cy={preview.end.y} r="3" fill="#6366F1" />
+                  </g>
+                );
+              })()}
             </svg>
 
             {/* Cards */}
@@ -812,7 +982,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <LayoutGrid className={`w-10 h-10 mb-3 ${dark ? 'text-zinc-700' : 'text-zinc-300'}`} />
               <p className={`text-sm font-bold ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Your canvas is empty</p>
-              <p className={`text-xs mt-1 ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>Pick a tool on the left, or paste / drop an image or link</p>
+              <p className={`text-xs mt-1 ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>Pick a tool from the dock below, or paste / drop an image or link</p>
             </div>
           )}
 
@@ -825,45 +995,79 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme 
             </div>
           )}
 
-          {/* Connect-mode hint */}
+          {/* Connect-mode floating interactive banner (positioned above bottom dock) */}
           {activeTool === 'connect' && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-indigo-500 text-white text-xs font-bold rounded-full shadow-lg pointer-events-none">
-              {connectSourceId ? 'Click a second card to connect' : 'Click the first card to start a line'}
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[140] flex items-center gap-3 px-4 py-2 bg-zinc-900/95 text-white text-xs font-bold rounded-full shadow-2xl border border-indigo-500/40 backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
+              {connectSourceId ? (
+                <>
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+                    <span>Connecting from: <span className="text-indigo-300 font-extrabold">{sourceCardTitle ? `"${sourceCardTitle}"` : 'Selected card'}</span></span>
+                  </span>
+                  <span className="text-zinc-400">• Click target card</span>
+                  <button
+                    onClick={() => { setConnectSourceId(null); setConnectPointer(null); }}
+                    className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex items-center gap-2">
+                    <Spline className="w-4 h-4 text-indigo-400" />
+                    <span>Click any card to start curve connection</span>
+                  </span>
+                  <button
+                    onClick={() => { setActiveTool('select'); setConnectSourceId(null); setConnectPointer(null); }}
+                    className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] transition-colors"
+                  >
+                    Exit
+                  </button>
+                </>
+              )}
             </div>
           )}
+
+          {/* Delete-mode banner (positioned above bottom dock) */}
           {activeTool === 'delete' && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg pointer-events-none">
-              Click any card to delete it
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[140] flex items-center gap-3 px-4 py-2 bg-red-950/90 text-white text-xs font-bold rounded-full shadow-2xl border border-red-500/40 backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
+              <span className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-red-400" />
+                <span>Click any card to delete it</span>
+              </span>
+              <button
+                onClick={() => setActiveTool('select')}
+                className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] transition-colors"
+              >
+                Exit
+              </button>
             </div>
           )}
+
+          {/* Figma UI3 Floating Bottom Toolbar Dock */}
+          <FigmaCanvasToolbar
+            activeTool={activeTool}
+            setActiveTool={setActiveTool}
+            onAddElement={addElement}
+            onConnectToggle={() => {
+              setActiveTool(t => (t === 'connect' ? 'select' : 'connect'));
+              setConnectSourceId(null);
+              setConnectPointer(null);
+            }}
+            onDeleteToggle={() => {
+              setActiveTool(t => (t === 'delete' ? 'select' : 'delete'));
+              setConnectSourceId(null);
+              setConnectPointer(null);
+            }}
+            onUploadClick={() => fileInputRef.current?.click()}
+            dark={dark}
+            defaultLineStyle={defaultLineStyle}
+            setDefaultLineStyle={setDefaultLineStyle}
+            connectSourceId={connectSourceId}
+          />
         </div>
       </div>
     </div>
-  );
-}
-
-function ToolbarButton({
-  children, label, onClick, active, danger, dark,
-}: {
-  children: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  danger?: boolean;
-  dark: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      className={`group relative w-14 flex flex-col items-center gap-1 py-2 rounded-xl transition-colors ${
-        active
-          ? danger ? 'bg-red-500 text-white' : 'bg-rose-500 text-white'
-          : dark ? 'text-zinc-400 hover:bg-zinc-800 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
-      }`}
-    >
-      {children}
-      <span className="text-[9px] font-bold leading-none">{label}</span>
-    </button>
   );
 }

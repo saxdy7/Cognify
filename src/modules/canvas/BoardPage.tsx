@@ -50,10 +50,8 @@ export function BoardPage({ boardId }: { boardId: string }) {
   return (
     <div className="p-3 md:p-4">
       <div className="relative h-[calc(100vh-5.5rem)] overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
-        {/* Share sits above the canvas' own toolbar, top-right */}
-        <Button variant="outline" size="sm" onClick={() => setShareOpen(true)} className="absolute top-3 right-3 z-20 bg-background/80 backdrop-blur">
-          <Users />{board.user_id === user.id ? 'Share' : 'Shared'}
-        </Button>
+
+
         {shareOpen && (
           <ShareDialog
             resource={{ type: 'board', id: board.id, title: board.name }}
@@ -68,6 +66,17 @@ export function BoardPage({ boardId }: { boardId: string }) {
           onBackToBoards={() => router.push('/dashboard/canvas')}
           theme={canvasTheme}
           setTheme={(t) => setTheme(t)}
+          headerActions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShareOpen(true)}
+              className="h-9 px-3.5 rounded-xl border font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Users className="w-3.5 h-3.5 text-rose-500" />
+              <span>{board.user_id === user.id ? 'Share' : 'Shared'}</span>
+            </Button>
+          }
         />
       </div>
     </div>

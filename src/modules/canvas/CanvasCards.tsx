@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Check, CheckSquare, Plus, Trash2, Link as LinkIcon,
-  ExternalLink, FileText, Download, ArrowRight, Palette,
-  Image as ImageIcon, Search, ChevronRight, MessageSquare, FolderOpen,
+  Plus, Trash2, Link as LinkIcon,
+  ExternalLink, FileText, Download, Palette,
+  Image as ImageIcon, Search, ChevronRight, FolderOpen,
   Pencil, Eraser, Undo2, Code2
 } from 'lucide-react';
 import { CanvasElement } from '@/types';
@@ -92,7 +92,7 @@ interface CanvasCardProps {
   onDelete: (id: string) => void;
   onClick: (id: string) => void;
   isConnectingSource: boolean;
-  activeTool: 'select' | 'connect' | 'delete';
+  activeTool: 'select' | 'connect' | 'delete' | 'hand';
 }
 
 const PASTEL_COLORS = [
@@ -329,7 +329,7 @@ export const CanvasCard = React.memo(function CanvasCard({
       let hostname = 'website.com';
       try {
         hostname = new URL(url).hostname;
-      } catch (err) {}
+      } catch {}
       onUpdate(element.id, {
         content: {
           url,
@@ -864,6 +864,39 @@ export const CanvasCard = React.memo(function CanvasCard({
         overflow: isBorderless ? 'visible' : 'hidden',
       }}
     >
+      {/* Full-card pick overlay during Connect or Delete modes so ANY element type can be clicked */}
+      {(activeTool === "connect" || activeTool === "delete") && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(element.id);
+          }}
+          className={`absolute inset-0 z-40 rounded-xl flex items-start justify-start p-2 transition-all ${
+            activeTool === "connect"
+              ? isConnectingSource
+                ? "bg-indigo-500/15 ring-2 ring-indigo-500 cursor-pointer"
+                : "bg-transparent hover:bg-indigo-500/10 cursor-pointer"
+              : "bg-transparent hover:bg-red-500/15 ring-2 ring-red-400 cursor-crosshair"
+          }`}
+        >
+          {activeTool === "connect" && isConnectingSource && (
+            <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-black uppercase tracking-wider shadow-md animate-pulse">
+              Source Card
+            </span>
+          )}
+          {activeTool === "connect" && !isConnectingSource && (
+            <span className="px-2.5 py-0.5 rounded-full bg-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
+              Click to Connect
+            </span>
+          )}
+          {activeTool === "delete" && (
+            <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
+              Click to Delete
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       <div className={`relative w-full h-full flex flex-col ${isBorderless ? 'p-0' : 'p-4'}`}>
         {/* Hover action buttons - color picker & delete */}
