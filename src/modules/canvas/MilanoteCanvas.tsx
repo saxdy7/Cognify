@@ -1018,9 +1018,11 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
               : 'cursor-default'
           }`}
           style={{
-            backgroundImage: `radial-gradient(circle, ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'} 1px, transparent 1px)`,
-            backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
-            backgroundPosition: `${pan.x}px ${pan.y}px`,
+            backgroundImage: dark
+              ? `radial-gradient(circle, rgba(255, 255, 255, 0.14) 1.25px, transparent 1.25px), radial-gradient(circle at 50% 40%, rgba(255, 107, 0, 0.04) 0%, rgba(99, 102, 241, 0.02) 50%, transparent 85%)`
+              : `radial-gradient(circle, rgba(0, 0, 0, 0.13) 1.25px, transparent 1.25px), radial-gradient(circle at 50% 40%, rgba(255, 107, 0, 0.03) 0%, transparent 75%)`,
+            backgroundSize: `${28 * zoom}px ${28 * zoom}px, 100% 100%`,
+            backgroundPosition: `${pan.x}px ${pan.y}px, 0 0`,
             touchAction: 'none',
             overscrollBehavior: 'none',
           }}
@@ -1108,10 +1110,36 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
 
           {/* Empty state */}
           {elements.length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <LayoutGrid className={`w-10 h-10 mb-3 ${dark ? 'text-zinc-700' : 'text-zinc-300'}`} />
-              <p className={`text-sm font-bold ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Your canvas is empty</p>
-              <p className={`text-xs mt-1 ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>Pick a tool from the dock below, or paste / drop an image or link</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+              <div className="flex flex-col items-center max-w-md p-8 rounded-3xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl shadow-2xl text-center">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500/20 to-indigo-500/20 border border-white/15 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(255,107,0,0.2)]">
+                  <LayoutGrid className="w-6 h-6 text-orange-400" />
+                </div>
+                <h3 className={`text-base font-black font-space-grotesk tracking-tight mb-1.5 ${dark ? 'text-white' : 'text-zinc-900'}`}>
+                  Your Creative Workspace
+                </h3>
+                <p className={`text-xs mb-6 max-w-xs leading-relaxed ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                  Double-click anywhere to create a note, or pick a tool from the floating dock below.
+                </p>
+                <div className="grid grid-cols-2 gap-2 w-full text-left">
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] font-medium ${dark ? 'bg-zinc-900/60 border-white/10 text-zinc-300' : 'bg-white/80 border-zinc-200 text-zinc-700'}`}>
+                    <span>Note / Card</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">N</kbd>
+                  </div>
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] font-medium ${dark ? 'bg-zinc-900/60 border-white/10 text-zinc-300' : 'bg-white/80 border-zinc-200 text-zinc-700'}`}>
+                    <span>Column Lane</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">F</kbd>
+                  </div>
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] font-medium ${dark ? 'bg-zinc-900/60 border-white/10 text-zinc-300' : 'bg-white/80 border-zinc-200 text-zinc-700'}`}>
+                    <span>Connect Lines</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">L</kbd>
+                  </div>
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] font-medium ${dark ? 'bg-zinc-900/60 border-white/10 text-zinc-300' : 'bg-white/80 border-zinc-200 text-zinc-700'}`}>
+                    <span>Touchpad Zoom</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">Pinch</kbd>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
