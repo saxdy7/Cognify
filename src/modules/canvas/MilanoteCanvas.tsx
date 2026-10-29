@@ -660,55 +660,57 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
       const target = e.target as HTMLElement | null;
       // Allow internal scrolling inside textareas / code editors only when NOT zooming
       if (target?.closest('textarea, [contenteditable="true"], .overflow-y-auto')) {
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
           return;
         }
       }
 
-      // Intercept wheel on canvas to handle smooth zoom without bubbling to page
+      // Intercept wheel on canvas to prevent full-page browser scrolling
       e.preventDefault();
       e.stopPropagation();
 
-      // If user holds Space, Shift, or has activeTool === 'hand', then two-finger swipe pans:
-      if (isSpacePressedRef.current || activeTool === 'hand' || e.shiftKey) {
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        // ── 1. TOUCHPAD PINCH-TO-ZOOM & CTRL/ALT SCROLL ──
+        // In Windows/Chrome/Edge/macOS, touchpad pinch emits wheel events with e.ctrlKey = true.
+        // deltaY < 0 (pinching fingers apart) -> ZOOM IN
+        // deltaY > 0 (pinching fingers together) -> ZOOM OUT
+        let delta = -e.deltaY;
+        if (e.deltaMode === 1) delta *= 20; // Lines mode
+        else if (e.deltaMode === 2) delta *= 100; // Pages mode
+
+        // Smooth, responsive exponential scaling for immediate touchpad response
+        const factor = Math.exp(delta * 0.012);
+        const clampedFactor = Math.min(Math.max(factor, 0.7), 1.4);
+
+        const currentZoom = zoomRef.current;
+        const newZoom = Math.min(Math.max(currentZoom * clampedFactor, 0.1), 5);
+
+        if (Math.abs(newZoom - currentZoom) > 0.0001) {
+          zoomRef.current = newZoom;
+
+          const rect = surface.getBoundingClientRect();
+          const cursorX = e.clientX - rect.left;
+          const cursorY = e.clientY - rect.top;
+
+          const currentPan = panRef.current;
+          const ratio = newZoom / currentZoom;
+          const nextPanX = cursorX - (cursorX - currentPan.x) * ratio;
+          const nextPanY = cursorY - (cursorY - currentPan.y) * ratio;
+
+          panRef.current = { x: nextPanX, y: nextPanY };
+
+          setZoom(newZoom);
+          setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
+        }
+      } else {
+        // ── 2. TWO FINGERS ON TOUCHPAD: PAN LEFT, RIGHT, TOP, DOWN ──
+        // Moving 2 fingers horizontally pans left/right (e.deltaX)
+        // Moving 2 fingers vertically pans top/down (e.deltaY)
         const currentPan = panRef.current;
         const nextPanX = currentPan.x - e.deltaX;
         const nextPanY = currentPan.y - e.deltaY;
 
         panRef.current = { x: nextPanX, y: nextPanY };
-        setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
-        return;
-      }
-
-      // Touchpad: rubbing two fingers up/down or pinching directly zooms in/out
-      let delta = -e.deltaY;
-      if (e.deltaMode === 1) delta *= 20; // Lines mode
-      else if (e.deltaMode === 2) delta *= 100; // Pages mode
-
-      // Responsive exponential zoom factor
-      const factor = Math.exp(delta * 0.004);
-      const clampedFactor = Math.min(Math.max(factor, 0.75), 1.3);
-
-      const currentZoom = zoomRef.current;
-      const newZoom = Math.min(Math.max(currentZoom * clampedFactor, 0.1), 5);
-
-      if (Math.abs(newZoom - currentZoom) > 0.0001) {
-        // Synchronously update zoomRef.current
-        zoomRef.current = newZoom;
-
-        const rect = surface.getBoundingClientRect();
-        const cursorX = e.clientX - rect.left;
-        const cursorY = e.clientY - rect.top;
-
-        const currentPan = panRef.current;
-        const ratio = newZoom / currentZoom;
-        const nextPanX = cursorX - (cursorX - currentPan.x) * ratio;
-        const nextPanY = cursorY - (cursorY - currentPan.y) * ratio;
-
-        // Synchronously update panRef.current
-        panRef.current = { x: nextPanX, y: nextPanY };
-
-        setZoom(newZoom);
         setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
       }
     };
