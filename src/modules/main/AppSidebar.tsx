@@ -38,7 +38,22 @@ export function AppSidebar() {
   const { loading, notes, boards, bookmarks, user } = useWorkspace();
   const { openAi } = useShell();
 
+  // Explicitly block any zooming when the cursor is over the sidebar
+  const sidebarContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sidebarContainerRef.current;
+    if (!el) return;
 
+    const blockSidebarZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    el.addEventListener('wheel', blockSidebarZoom, { passive: false });
+    return () => el.removeEventListener('wheel', blockSidebarZoom);
+  }, []);
 
   const favoriteLinks = bookmarks.filter((b) => b.is_favorite).slice(0, 5);
   const recentPages = [...notes]
@@ -49,7 +64,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <div className="flex flex-col h-full w-full">
+      <div ref={sidebarContainerRef} className="flex flex-col h-full w-full">
         <SidebarHeader className="border-b border-sidebar-border">
           <Link href="/dashboard" className="flex h-12 items-center gap-2.5 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <CognifyLogo className="size-7 shrink-0" />

@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Link as LinkIcon,
   ExternalLink, FileText, Download, Palette,
   Image as ImageIcon, Search, ChevronRight, FolderOpen,
-  Pencil, Eraser, Undo2, Code2
+  Pencil, Eraser, Undo2, Code2, ZoomIn, Maximize2, Minimize2
 } from 'lucide-react';
 import { CanvasElement } from '@/types';
 import { toast } from 'sonner';
@@ -93,6 +93,7 @@ interface CanvasCardProps {
   onClick: (id: string) => void;
   isConnectingSource: boolean;
   activeTool: 'select' | 'connect' | 'delete' | 'hand';
+  onZoomTo?: (id: string) => void;
 }
 
 const PASTEL_COLORS = [
@@ -106,6 +107,60 @@ const PASTEL_COLORS = [
   { name: 'Purple', value: '#F3E8FF', darkValue: '#3b0764' },
 ];
 
+
+function NoteCardContent({
+  element,
+  theme,
+  onUpdate,
+}: {
+  element: CanvasElement;
+  theme: string;
+  onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = () => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(120, el.scrollHeight)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustHeight();
+  }, [element.content?.body]);
+
+  return (
+    <div className="flex flex-col h-full select-text pointer-events-auto">
+      <input
+        type="text"
+        value={element.content?.title || ''}
+        onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
+        placeholder="Note Title"
+        className={`w-full bg-transparent font-semibold text-sm outline-none pb-1.5 mb-2 ${
+          theme === 'dark' 
+            ? 'text-zinc-100 border-b border-zinc-700/40 placeholder:text-zinc-600' 
+            : 'text-zinc-800 border-b border-zinc-200/60 placeholder:text-zinc-400'
+        }`}
+      />
+      <textarea
+        ref={textareaRef}
+        value={element.content?.body || ''}
+        onChange={(e) => {
+          onUpdate(element.id, { content: { ...element.content, body: e.target.value } });
+          adjustHeight();
+        }}
+        placeholder="Type your notes..."
+        className={`w-full bg-transparent text-xs leading-relaxed outline-none resize-none overflow-y-auto ${
+          theme === 'dark' ? 'text-zinc-300 placeholder:text-zinc-600' : 'text-zinc-600 placeholder:text-zinc-400'
+        }`}
+        style={{ minHeight: 120 }}
+      />
+    </div>
+  );
+}
+
 export const CanvasCard = React.memo(function CanvasCard({
   element,
   theme = 'light',
@@ -118,9 +173,11 @@ export const CanvasCard = React.memo(function CanvasCard({
   onDelete,
   onClick,
   isConnectingSource,
-  activeTool
+  activeTool,
+  onZoomTo,
 }: CanvasCardProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isExpandedModal, setIsExpandedModal] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   // Custom free image search states
@@ -348,27 +405,11 @@ export const CanvasCard = React.memo(function CanvasCard({
     switch (element.type) {
       case 'note':
         return (
-          <div className="flex flex-col h-full select-text pointer-events-auto">
-            <input
-              type="text"
-              value={element.content.title || ''}
-              onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
-              placeholder="Note Title"
-              className={`w-full bg-transparent font-semibold text-sm outline-none pb-1.5 mb-2 ${
-                theme === 'dark' 
-                  ? 'text-zinc-100 border-b border-zinc-700/40 placeholder:text-zinc-600' 
-                  : 'text-zinc-800 border-b border-zinc-200/60 placeholder:text-zinc-400'
-              }`}
-            />
-            <textarea
-              value={element.content.body || ''}
-              onChange={(e) => onUpdate(element.id, { content: { ...element.content, body: e.target.value } })}
-              placeholder="Type your notes..."
-              className={`w-full flex-1 bg-transparent text-xs leading-relaxed outline-none resize-none ${
-                theme === 'dark' ? 'text-zinc-300 placeholder:text-zinc-600' : 'text-zinc-600 placeholder:text-zinc-400'
-              }`}
-            />
-          </div>
+          <NoteCardContent
+            element={element}
+            theme={theme}
+            onUpdate={onUpdate}
+          />
         );
 
       case 'text':
@@ -853,15 +894,16 @@ export const CanvasCard = React.memo(function CanvasCard({
         left: 0,
         top: 0,
         transform: `translate3d(${element.x}px, ${element.y}px, 0)`,
-        width: element.width || 280,
-        height: element.height || 180,
+        width: element.width || (element.type === 'note' ? 320 : 280),
+        minHeight: element.height || 180,
+        height: element.type === 'note' ? 'auto' : (element.height || 180),
         backgroundColor: getCardBackground(),
         borderWidth: isBorderless ? 0 : 1,
         borderStyle: 'solid',
         borderColor: getCardBorder(),
         backdropFilter: element.type === 'column' ? 'blur(12px)' : undefined,
         WebkitBackdropFilter: element.type === 'column' ? 'blur(12px)' : undefined,
-        overflow: isBorderless ? 'visible' : 'hidden',
+        overflow: isBorderless || element.type === 'note' ? 'visible' : 'hidden',
       }}
     >
       {/* Full-card pick overlay during Connect or Delete modes so ANY element type can be clicked */}
@@ -899,11 +941,31 @@ export const CanvasCard = React.memo(function CanvasCard({
 
       {/* Content */}
       <div className={`relative w-full h-full flex flex-col ${isBorderless ? 'p-0' : 'p-4'}`}>
-        {/* Hover action buttons - color picker & delete */}
+        {/* Hover action buttons - zoom, expand, color picker & delete */}
         {element.type !== 'text' && element.type !== 'column' && activeTool === 'select' && (
           <div className={`absolute top-2 right-2 flex items-center gap-1 z-20 transition-opacity duration-150 ${
             isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
+            {onZoomTo && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onZoomTo(element.id); }}
+                className={`p-1 rounded-md transition-colors ${
+                  theme === 'dark' ? 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white' : 'bg-white/90 hover:bg-white text-zinc-600 hover:text-zinc-900 shadow-sm'
+                }`}
+                title="Zoom camera to this container"
+              >
+                <ZoomIn className="w-3 h-3" />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsExpandedModal(true); }}
+              className={`p-1 rounded-md transition-colors ${
+                theme === 'dark' ? 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white' : 'bg-white/90 hover:bg-white text-zinc-600 hover:text-zinc-900 shadow-sm'
+              }`}
+              title="Expand to Fullscreen Focus Editor"
+            >
+              <Maximize2 className="w-3 h-3" />
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); setShowColorPicker(!showColorPicker); }}
               className={`p-1 rounded-md transition-colors ${

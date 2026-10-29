@@ -665,49 +665,50 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         }
       }
 
-      // Intercept wheel on canvas to handle smooth zoom/pan without bubbling to page
+      // Intercept wheel on canvas to handle smooth zoom without bubbling to page
       e.preventDefault();
       e.stopPropagation();
 
-      if (e.ctrlKey || e.metaKey) {
-        // Trackpad pinch gesture (Windows Precision Touchpad, macOS, Chrome/Edge) or Ctrl + Mouse Wheel
-        let delta = -e.deltaY;
-        if (e.deltaMode === 1) delta *= 20; // Lines mode
-        else if (e.deltaMode === 2) delta *= 100; // Pages mode
-
-        // Continuous exponential zoom factor for buttery smooth touchpad response
-        const factor = Math.exp(delta * 0.005);
-        const clampedFactor = Math.min(Math.max(factor, 0.8), 1.25);
-
-        const currentZoom = zoomRef.current;
-        const newZoom = Math.min(Math.max(currentZoom * clampedFactor, 0.1), 5);
-
-        if (Math.abs(newZoom - currentZoom) > 0.0001) {
-          // Synchronously sync zoomRef.current so consecutive micro-events don't use stale values
-          zoomRef.current = newZoom;
-
-          const rect = surface.getBoundingClientRect();
-          const cursorX = e.clientX - rect.left;
-          const cursorY = e.clientY - rect.top;
-
-          const currentPan = panRef.current;
-          const ratio = newZoom / currentZoom;
-          const nextPanX = cursorX - (cursorX - currentPan.x) * ratio;
-          const nextPanY = cursorY - (cursorY - currentPan.y) * ratio;
-
-          // Synchronously sync panRef.current
-          panRef.current = { x: nextPanX, y: nextPanY };
-
-          setZoom(newZoom);
-          setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
-        }
-      } else {
-        // Trackpad 2-finger scroll or standard mouse wheel -> Canvas Pan
+      // If user holds Space, Shift, or has activeTool === 'hand', then two-finger swipe pans:
+      if (isSpacePressedRef.current || activeTool === 'hand' || e.shiftKey) {
         const currentPan = panRef.current;
         const nextPanX = currentPan.x - e.deltaX;
         const nextPanY = currentPan.y - e.deltaY;
 
         panRef.current = { x: nextPanX, y: nextPanY };
+        setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
+        return;
+      }
+
+      // Touchpad: rubbing two fingers up/down or pinching directly zooms in/out
+      let delta = -e.deltaY;
+      if (e.deltaMode === 1) delta *= 20; // Lines mode
+      else if (e.deltaMode === 2) delta *= 100; // Pages mode
+
+      // Responsive exponential zoom factor
+      const factor = Math.exp(delta * 0.004);
+      const clampedFactor = Math.min(Math.max(factor, 0.75), 1.3);
+
+      const currentZoom = zoomRef.current;
+      const newZoom = Math.min(Math.max(currentZoom * clampedFactor, 0.1), 5);
+
+      if (Math.abs(newZoom - currentZoom) > 0.0001) {
+        // Synchronously update zoomRef.current
+        zoomRef.current = newZoom;
+
+        const rect = surface.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        const currentPan = panRef.current;
+        const ratio = newZoom / currentZoom;
+        const nextPanX = cursorX - (cursorX - currentPan.x) * ratio;
+        const nextPanY = cursorY - (cursorY - currentPan.y) * ratio;
+
+        // Synchronously update panRef.current
+        panRef.current = { x: nextPanX, y: nextPanY };
+
+        setZoom(newZoom);
         setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
       }
     };
@@ -871,6 +872,37 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
       });
       return next;
     });
+  };
+
+
+  const zoomToElement = (elementId: string) => {
+    const el = elements.find(e => e.id === elementId);
+    if (!el) return;
+    const rect = surfaceRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const targetWidth = el.width || 320;
+    const targetHeight = el.height || 220;
+
+    const scaleX = (rect.width * 0.72) / targetWidth;
+    const scaleY = (rect.height * 0.72) / targetHeight;
+    const desiredZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.7), 2.2);
+
+    const viewCenterX = rect.width / 2;
+    const viewCenterY = rect.height / 2;
+
+    const cardCenterX = el.x + targetWidth / 2;
+    const cardCenterY = el.y + targetHeight / 2;
+
+    const nextPanX = Math.round(viewCenterX - cardCenterX * desiredZoom);
+    const nextPanY = Math.round(viewCenterY - cardCenterY * desiredZoom);
+
+    triggerSmoothZoom();
+    zoomRef.current = desiredZoom;
+    panRef.current = { x: nextPanX, y: nextPanY };
+    setZoom(desiredZoom);
+    setPan({ x: nextPanX, y: nextPanY });
+    setSelectedId(elementId);
   };
 
   const resetView = () => {
@@ -1103,6 +1135,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
                   onUpdate={handleUpdate}
                   onDelete={handleDelete}
                   onClick={handleCardClick}
+                  onZoomTo={zoomToElement}
                 />
               </div>
             ))}
