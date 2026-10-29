@@ -38,29 +38,7 @@ export function AppSidebar() {
   const { loading, notes, boards, bookmarks, user } = useWorkspace();
   const { openAi } = useShell();
 
-  // Scoped zoom for sidebar: zooms only the sidebar content when user zooms over sidebar
-  const [sidebarScale, setSidebarScale] = useState(1);
-  const sidebarContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const el = sidebarContainerRef.current;
-    if (!el) return;
-
-    const onSidebarWheel = (e: WheelEvent) => {
-      // Pinch gesture or Ctrl + wheel zoom
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        const factor = e.deltaY < 0 ? 1.05 : 0.95;
-        setSidebarScale(prev => Math.min(Math.max(prev * factor, 0.75), 1.35));
-      }
-    };
-
-    el.addEventListener('wheel', onSidebarWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', onSidebarWheel);
-    };
-  }, []);
 
   const favoriteLinks = bookmarks.filter((b) => b.is_favorite).slice(0, 5);
   const recentPages = [...notes]
@@ -71,11 +49,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <div
-        ref={sidebarContainerRef}
-        style={sidebarScale !== 1 ? ({ zoom: sidebarScale } as React.CSSProperties) : undefined}
-        className="flex flex-col h-full w-full"
-      >
+      <div className="flex flex-col h-full w-full">
         <SidebarHeader className="border-b border-sidebar-border">
           <Link href="/dashboard" className="flex h-12 items-center gap-2.5 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <CognifyLogo className="size-7 shrink-0" />
@@ -245,14 +219,7 @@ export function AppSidebar() {
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border group-data-[collapsible=icon]:hidden">
-          {sidebarScale !== 1 && (
-            <button
-              onClick={() => setSidebarScale(1)}
-              className="text-[10px] font-medium text-sidebar-foreground/70 hover:text-foreground text-center py-1 bg-sidebar-accent/50 rounded-md transition-colors"
-            >
-              Sidebar zoom: {Math.round(sidebarScale * 100)}% · Click to reset
-            </button>
-          )}
+
           <div className="space-y-2 rounded-lg bg-linear-to-br from-ai/15 via-ai/5 to-transparent p-3">
             <div className="flex items-start gap-2">
               <Sparkles className="mt-0.5 size-4 text-ai" />

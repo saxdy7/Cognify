@@ -628,6 +628,11 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         else if (k === 'p' || k === 'l') setActiveTool(t => (t === 'connect' ? 'select' : 'connect'));
         else if (k === 'c') addElement('note', { content: { title: 'Comment', body: '' }, color: '#DBEAFE' });
         else if (k === 'd') addElement('sketch');
+        else if (e.key === '+' || e.key === '=') zoomBy(1.15);
+        else if (e.key === '-' || e.key === '_') zoomBy(0.85);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        resetView();
       }
     };
 
@@ -646,7 +651,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     };
   }, [selectedId, handleDelete, addElement]);
 
-  // ─────────────────────────── Non-passive Wheel Listener (Zoom Isolation) ───────────────────────────
+  // ─────────────────────────── Smooth Touchpad Pinch, Pan & Multi-Touch Gestures ───────────────────────────
   useEffect(() => {
     const surface = surfaceRef.current;
     if (!surface) return;
@@ -660,37 +665,153 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         }
       }
 
-      // Non-passive preventDefault() strictly prevents native full-page browser zoom
+      // Intercept wheel on canvas to handle smooth zoom/pan without bubbling to page
       e.preventDefault();
       e.stopPropagation();
 
       if (e.ctrlKey || e.metaKey) {
-        // Trackpad pinch or Ctrl + Mouse Wheel -> Canvas Zoom
-        const zoomFactor = e.deltaY < 0 ? 1.06 : 0.94;
+        // Trackpad pinch gesture (Windows Precision Touchpad, macOS, Chrome/Edge) or Ctrl + Mouse Wheel
+        let delta = -e.deltaY;
+        if (e.deltaMode === 1) delta *= 20; // Lines mode
+        else if (e.deltaMode === 2) delta *= 100; // Pages mode
+
+        // Continuous exponential zoom factor for buttery smooth touchpad response
+        const factor = Math.exp(delta * 0.005);
+        const clampedFactor = Math.min(Math.max(factor, 0.8), 1.25);
+
         const currentZoom = zoomRef.current;
-        const newZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.2), 3);
+        const newZoom = Math.min(Math.max(currentZoom * clampedFactor, 0.1), 5);
 
-        const rect = surface.getBoundingClientRect();
-        const cursorX = e.clientX - rect.left;
-        const cursorY = e.clientY - rect.top;
+        if (Math.abs(newZoom - currentZoom) > 0.0001) {
+          // Synchronously sync zoomRef.current so consecutive micro-events don't use stale values
+          zoomRef.current = newZoom;
 
-        setPan(prev => ({
-          x: Math.round(cursorX - (cursorX - prev.x) * (newZoom / currentZoom)),
-          y: Math.round(cursorY - (cursorY - prev.y) * (newZoom / currentZoom)),
-        }));
-        setZoom(newZoom);
+          const rect = surface.getBoundingClientRect();
+          const cursorX = e.clientX - rect.left;
+          const cursorY = e.clientY - rect.top;
+
+          const currentPan = panRef.current;
+          const ratio = newZoom / currentZoom;
+          const nextPanX = cursorX - (cursorX - currentPan.x) * ratio;
+          const nextPanY = cursorY - (cursorY - currentPan.y) * ratio;
+
+          // Synchronously sync panRef.current
+          panRef.current = { x: nextPanX, y: nextPanY };
+
+          setZoom(newZoom);
+          setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
+        }
       } else {
         // Trackpad 2-finger scroll or standard mouse wheel -> Canvas Pan
-        setPan(prev => ({
-          x: Math.round(prev.x - e.deltaX),
-          y: Math.round(prev.y - e.deltaY),
-        }));
+        const currentPan = panRef.current;
+        const nextPanX = currentPan.x - e.deltaX;
+        const nextPanY = currentPan.y - e.deltaY;
+
+        panRef.current = { x: nextPanX, y: nextPanY };
+        setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
       }
     };
 
+    // ── Touchscreen 2-Finger Pinch & Pan ──
+    let initialTouchDist = 0;
+    let initialTouchZoom = 1;
+    let initialTouchPan = { x: 0, y: 0 };
+    let initialTouchCenter = { x: 0, y: 0 };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        initialTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        initialTouchZoom = zoomRef.current;
+        initialTouchPan = { ...panRef.current };
+
+        const rect = surface.getBoundingClientRect();
+        initialTouchCenter = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        };
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialTouchDist > 0) {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const rect = surface.getBoundingClientRect();
+
+        const currentCenter = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        };
+
+        const scale = currentDist / initialTouchDist;
+        const newZoom = Math.min(Math.max(initialTouchZoom * scale, 0.1), 5);
+        zoomRef.current = newZoom;
+
+        const ratio = newZoom / initialTouchZoom;
+        const nextPanX = currentCenter.x - (initialTouchCenter.x - initialTouchPan.x) * ratio;
+        const nextPanY = currentCenter.y - (initialTouchCenter.y - initialTouchPan.y) * ratio;
+
+        panRef.current = { x: nextPanX, y: nextPanY };
+
+        setZoom(newZoom);
+        setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
+      }
+    };
+
+    const onTouchEnd = () => {
+      initialTouchDist = 0;
+    };
+
+    // ── WebKit / Safari Trackpad Gestures ──
+    let initialGestureZoom = 1;
+    let gestureCenter = { x: 0, y: 0 };
+
+    const onGestureStart = (e: any) => {
+      e.preventDefault();
+      initialGestureZoom = zoomRef.current;
+      const rect = surface.getBoundingClientRect();
+      gestureCenter = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    };
+
+    const onGestureChange = (e: any) => {
+      e.preventDefault();
+      const newZoom = Math.min(Math.max(initialGestureZoom * e.scale, 0.1), 5);
+      const currentZoom = zoomRef.current;
+      zoomRef.current = newZoom;
+
+      const currentPan = panRef.current;
+      const ratio = newZoom / currentZoom;
+      const nextPanX = gestureCenter.x - (gestureCenter.x - currentPan.x) * ratio;
+      const nextPanY = gestureCenter.y - (gestureCenter.y - currentPan.y) * ratio;
+
+      panRef.current = { x: nextPanX, y: nextPanY };
+
+      setZoom(newZoom);
+      setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
+    };
+
     surface.addEventListener('wheel', onWheel, { passive: false });
+    surface.addEventListener('touchstart', onTouchStart, { passive: false });
+    surface.addEventListener('touchmove', onTouchMove, { passive: false });
+    surface.addEventListener('touchend', onTouchEnd);
+    surface.addEventListener('gesturestart', onGestureStart as any);
+    surface.addEventListener('gesturechange', onGestureChange as any);
+
     return () => {
       surface.removeEventListener('wheel', onWheel);
+      surface.removeEventListener('touchstart', onTouchStart);
+      surface.removeEventListener('touchmove', onTouchMove);
+      surface.removeEventListener('touchend', onTouchEnd);
+      surface.removeEventListener('gesturestart', onGestureStart as any);
+      surface.removeEventListener('gesturechange', onGestureChange as any);
     };
   }, []);
 
@@ -714,9 +835,12 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     const startY = e.clientY - panRef.current.y;
 
     const onMove = (moveEvt: MouseEvent) => {
+      const nextX = Math.round(moveEvt.clientX - startX);
+      const nextY = Math.round(moveEvt.clientY - startY);
+      panRef.current = { x: nextX, y: nextY };
       setPan({
-        x: Math.round(moveEvt.clientX - startX),
-        y: Math.round(moveEvt.clientY - startY),
+        x: nextX,
+        y: nextY,
       });
     };
 
@@ -737,17 +861,22 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     const cy = rect ? rect.height / 2 : 300;
 
     setZoom(prev => {
-      const next = Math.min(Math.max(prev * factor, 0.2), 3);
-      setPan(p => ({
-        x: Math.round(cx - (cx - p.x) * (next / prev)),
-        y: Math.round(cy - (cy - p.y) * (next / prev)),
-      }));
+      const next = Math.min(Math.max(prev * factor, 0.1), 5);
+      zoomRef.current = next;
+      setPan(p => {
+        const nextX = Math.round(cx - (cx - p.x) * (next / prev));
+        const nextY = Math.round(cy - (cy - p.y) * (next / prev));
+        panRef.current = { x: nextX, y: nextY };
+        return { x: nextX, y: nextY };
+      });
       return next;
     });
   };
 
   const resetView = () => {
     triggerSmoothZoom();
+    zoomRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };

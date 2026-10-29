@@ -24,38 +24,7 @@ import { UnreadBadge } from '@/modules/inbox/NotificationsInbox';
  * (LiveblocksProvider) are scoped here so marketing pages stay static.
  */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  // Global zoom prevention: prevent browser-level full webpage zoom
-  useEffect(() => {
-    const onGlobalWheel = (e: WheelEvent) => {
-      // If Ctrl or Meta is held, user is attempting to zoom the entire browser window
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-      }
-    };
 
-    const onGlobalKeyDown = (e: KeyboardEvent) => {
-      // Prevent Ctrl + '+', Ctrl + '-', Ctrl + '=', Ctrl + '0' native browser zoom
-      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
-        e.preventDefault();
-      }
-    };
-
-    const onGesture = (e: Event) => {
-      e.preventDefault();
-    };
-
-    window.addEventListener('wheel', onGlobalWheel, { passive: false });
-    window.addEventListener('keydown', onGlobalKeyDown);
-    window.addEventListener('gesturestart', onGesture);
-    window.addEventListener('gesturechange', onGesture);
-
-    return () => {
-      window.removeEventListener('wheel', onGlobalWheel);
-      window.removeEventListener('keydown', onGlobalKeyDown);
-      window.removeEventListener('gesturestart', onGesture);
-      window.removeEventListener('gesturechange', onGesture);
-    };
-  }, []);
 
   return (
     <WorkspaceProvider>

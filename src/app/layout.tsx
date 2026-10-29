@@ -21,6 +21,14 @@ export const metadata: Metadata = {
     template: "%s · Cognify",
   },
   description: "Organize links, boards and docs in one collaborative workspace.",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/logo-mark.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
