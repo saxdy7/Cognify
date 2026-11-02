@@ -2,8 +2,10 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Minus } from 'lucide-react';
-import { BlurText } from '@/components/motion/blur-text';
+import { Plus } from 'lucide-react';
+import { SplitReveal, Stagger, StaggerItem } from '@/components/motion/reveal';
+import { EASE_OUT } from '@/lib/motion';
+import { cn } from '@/lib/utils';
 
 const faqs = [
   {
@@ -24,72 +26,71 @@ const faqs = [
   },
 ];
 
-const FAQItem = ({ question, answer, index }: { question: string, answer: string, index: number }) => {
+const FAQItem = ({ question, answer }: { question: string; answer: string }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: index * 0.1 }}
-      className="border-b border-zinc-100 dark:border-zinc-800"
-    >
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full py-8 flex items-center justify-between text-left group"
-      >
-        <span className="text-xl font-bold font-space-grotesk group-hover:text-zinc-500 transition-colors">{question}</span>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isOpen ? 'bg-black dark:bg-white text-white dark:text-black rotate-180' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
-          {isOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-        </div>
-      </button>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
+    <StaggerItem>
+      <div className={cn('rounded-3xl bg-card ring-1 backdrop-blur-xl transition-[box-shadow,background-color] duration-300', isOpen ? 'ring-brand/40' : 'ring-foreground/[0.08] hover:ring-foreground/20')}>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          className="group flex w-full items-center justify-between gap-4 rounded-3xl px-6 py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60 md:px-8 md:py-6"
+        >
+          <span className="text-lg font-bold md:text-xl">{question}</span>
+          <span
+            className={cn(
+              'flex size-9 shrink-0 items-center justify-center rounded-full transition-all duration-500 ease-(--ease-pop)',
+              isOpen ? 'rotate-45 bg-brand text-brand-foreground' : 'bg-foreground/[0.07] group-hover:bg-foreground/[0.12]',
+            )}
           >
-            <p className="pb-8 text-zinc-500 dark:text-zinc-400 leading-relaxed text-lg">
-              {answer}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            <Plus className="size-4" />
+          </span>
+        </button>
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.4, ease: EASE_OUT }}
+              className="overflow-hidden"
+            >
+              <p className="px-6 pb-6 text-base leading-relaxed text-muted-foreground md:px-8 md:pb-8 md:text-lg">{answer}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </StaggerItem>
   );
 };
 
 export const LandingFAQ = () => {
   return (
-    <section id="faq" className="py-16 md:py-24 lg:py-32 bg-white dark:bg-black">
-      <div className="container px-4 sm:px-6 mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 lg:gap-24">
-          <div>
-            <BlurText
-              text="Frequently Asked Questions."
-              className="text-4xl md:text-6xl font-bold font-space-grotesk tracking-tight mb-8"
-              delay={150}
-              animateBy="words"
-              direction="bottom"
-            />
+    <section id="faq" className="py-20 md:py-28 lg:py-32">
+      <div className="container mx-auto px-4 sm:px-6">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-5 lg:gap-16">
+          <div className="lg:col-span-2">
+            <h2 className="mb-6 text-4xl leading-[1.02] font-bold tracking-tight md:text-6xl">
+              <SplitReveal inView text="Frequently Asked" />
+              <br />
+              <SplitReveal inView text="Questions." delay={0.1} className="text-muted-foreground" />
+            </h2>
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="text-xl text-zinc-500 leading-relaxed"
+              transition={{ delay: 0.2, duration: 0.7, ease: EASE_OUT }}
+              className="text-lg leading-relaxed text-muted-foreground"
             >
               Everything you need to know about the platform and how it can supercharge your productivity.
             </motion.p>
           </div>
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <FAQItem key={index} {...faq} index={index} />
+          <Stagger className="space-y-3 lg:col-span-3" gap={0.08}>
+            {faqs.map((faq) => (
+              <FAQItem key={faq.question} {...faq} />
             ))}
-          </div>
+          </Stagger>
         </div>
       </div>
     </section>

@@ -5,7 +5,15 @@ import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { HyperText } from '@/components/motion/hyper-text';
+import { CtaButton } from '@/components/site/CtaButton';
+import { CognifyLogo } from '@/modules/main/CognifyLogo';
+import { ThemeToggle } from '@/modules/main/ThemeToggle';
+import { EASE_OUT } from '@/lib/motion';
+import { cn } from '@/lib/utils';
 
+const LINKS = ['Features', 'Testimonials', 'FAQ'];
+
+/** Floating pill header: logo · section links · theme · sign-in / get started. Frosts more once you scroll. */
 export const LandingNavbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -19,61 +27,53 @@ export const LandingNavbar = () => {
     <motion.nav
       initial={{ opacity: 0, y: -24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-3' : 'py-6'}`}
+      transition={{ duration: 0.7, ease: EASE_OUT }}
+      className={cn('fixed top-0 right-0 left-0 z-50 transition-[padding] duration-500', scrolled ? 'py-3' : 'py-5')}
     >
-      <div className="max-w-5xl mx-auto px-4">
-        <div className={`relative flex items-center justify-between pl-4 pr-2 py-2 rounded-full transition-all duration-500 border ${scrolled ? 'bg-black/70 backdrop-blur-2xl shadow-2xl border-white/10' : 'bg-white/[0.04] backdrop-blur-xl border-white/[0.08]'}`}>
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/15 shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_30px_rgba(255,107,0,0.6)] flex items-center justify-center">
-              <img src="/logo-mark.png" alt="Cognify" className="w-full h-full object-cover scale-105" />
-            </div>
-            <span className="text-xl font-black font-space-grotesk tracking-tight text-white">Cognify</span>
+      <div className="mx-auto max-w-5xl px-4">
+        <div
+          className={cn(
+            'relative flex items-center justify-between rounded-full py-2 pr-2 pl-4 ring-1 backdrop-blur-2xl transition-[background-color,box-shadow] duration-500',
+            scrolled ? 'bg-card shadow-[0_18px_50px_-20px_rgba(10,14,12,0.45)] ring-foreground/10' : 'bg-card/60 ring-foreground/[0.07]',
+          )}
+        >
+          <Link href="/" className="group flex items-center gap-2.5" aria-label="Cognify home">
+            <CognifyLogo className="size-9 transition-transform duration-500 ease-(--ease-pop) group-hover:rotate-[-8deg] group-hover:scale-105" size={36} />
+            <span className="font-heading text-lg font-bold tracking-tight">Cognify</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-9">
-            {['Features', 'Testimonials', 'FAQ'].map((item) => (
+          <div className="hidden items-center gap-1 md:flex">
+            {LINKS.map((item) => (
               <Link
                 key={item}
                 href={`#${item.toLowerCase()}`}
-                className="text-sm font-bold text-white/80 hover:text-white transition-colors"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-300 hover:bg-foreground/[0.06] hover:text-foreground"
               >
-                <HyperText
-                  className="text-sm font-bold"
-                  animateOnHover={true}
-                  duration={600}
-                >
+                <HyperText className="text-sm font-semibold" animateOnHover={true} duration={600}>
                   {item}
                 </HyperText>
               </Link>
             ))}
           </div>
 
-          <div className="flex items-center gap-4">
-            <Link href="/login?mode=signup">
-              <button className="cssbuttons-io-button scale-75 origin-right">
-                Get started
-                <div className="icon">
-                  <svg
-                    height="24"
-                    width="24"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M0 0h24v24H0z" fill="none"></path>
-                    <path
-                      d="M16.172 11l-5.364-5.364 1.414-1.414L20 12l-7.778 7.778-1.414-1.414L16.172 13H4v-2z"
-                      fill="currentColor"
-                    ></path>
-                  </svg>
-                </div>
-              </button>
-            </Link>
-            <button
-              className="md:hidden p-2"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <Link
+              href="/login"
+              className="hidden rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground sm:block"
             >
-              {mobileMenuOpen ? <X /> : <Menu />}
+              Sign in
+            </Link>
+            <CtaButton href="/login?mode=signup" variant="brand" className="h-10 pl-5 text-sm [&>span:last-child]:size-7">
+              Get started
+            </CtaButton>
+            <button
+              className="rounded-full p-2 md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
             </button>
           </div>
         </div>
@@ -82,24 +82,24 @@ export const LandingNavbar = () => {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-full left-6 right-6 mt-4 p-8 bg-white dark:bg-zinc-900 rounded-[2rem] shadow-2xl border border-zinc-100 dark:border-zinc-800 md:hidden"
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.97 }}
+            transition={{ duration: 0.3, ease: EASE_OUT }}
+            className="absolute top-full right-4 left-4 mt-2 rounded-3xl bg-popover p-6 shadow-2xl ring-1 ring-foreground/10 backdrop-blur-2xl md:hidden"
           >
-            <div className="flex flex-col gap-6">
-              {['Features', 'Testimonials', 'FAQ'].map((item) => (
+            <div className="flex flex-col gap-1">
+              {[...LINKS, 'Sign in'].map((item) => (
                 <Link
                   key={item}
-                  href={`#${item.toLowerCase()}`}
+                  href={item === 'Sign in' ? '/login' : `#${item.toLowerCase()}`}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-lg font-bold"
+                  className="rounded-2xl px-4 py-3 text-lg font-semibold transition-colors hover:bg-foreground/[0.06]"
                 >
                   {item}
                 </Link>
               ))}
             </div>
-
           </motion.div>
         )}
       </AnimatePresence>

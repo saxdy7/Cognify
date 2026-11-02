@@ -3,58 +3,63 @@
 import React from 'react';
 import { Twitter, Github, Linkedin, Mail } from 'lucide-react';
 import Link from 'next/link';
+import { CognifyLogo } from '@/modules/main/CognifyLogo';
+
+const linkCls = 'inline-block text-muted-foreground transition-[color,transform] duration-300 hover:translate-x-1 hover:text-foreground';
 
 export const LandingFooter = () => {
   return (
-    <footer className="py-12 md:py-16 lg:py-24 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-900">
-      <div className="container px-4 sm:px-6 mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 lg:gap-16 mb-12 md:mb-16 lg:mb-24">
+    <footer className="px-3 pb-3 sm:px-4 sm:pb-4">
+      <div className="container mx-auto rounded-[2.5rem] bg-card px-6 py-12 ring-1 ring-foreground/[0.08] backdrop-blur-xl sm:px-10 md:py-16">
+        <div className="mb-12 grid grid-cols-1 gap-10 md:mb-16 md:grid-cols-2 lg:grid-cols-4 lg:gap-16">
           <div className="lg:col-span-2">
-            <Link href="/" className="flex items-center gap-3 mb-8 group">
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/15 shadow-md flex items-center justify-center transition-transform group-hover:scale-105">
-                <img src="/logo-mark.png" alt="Cognify" className="w-full h-full object-cover scale-105" />
-              </div>
-              <span className="text-xl font-bold font-space-grotesk tracking-tight">Cognify</span>
+            <Link href="/" className="group mb-6 flex items-center gap-3">
+              <CognifyLogo className="size-10 transition-transform duration-500 ease-(--ease-pop) group-hover:rotate-[-8deg] group-hover:scale-105" size={40} />
+              <span className="font-heading text-xl font-bold tracking-tight">Cognify</span>
             </Link>
-            <p className="text-xl text-zinc-500 max-w-sm leading-relaxed mb-10">
+            <p className="mb-8 max-w-sm text-lg leading-relaxed text-muted-foreground">
               The high-performance knowledge hub for the next generation of digital creators.
             </p>
-            <div className="flex items-center gap-6">
-              {[Twitter, Github, Linkedin, Mail].map((Icon, i) => (
-                <Link key={i} href="#" className="w-12 h-12 rounded-full bg-white dark:bg-zinc-900 flex items-center justify-center border border-zinc-100 dark:border-zinc-800 hover:scale-110 transition-transform">
-                  <Icon className="w-5 h-5" />
+            <div className="flex items-center gap-3">
+              {[
+                { Icon: Twitter, label: 'Twitter' },
+                { Icon: Github, label: 'GitHub' },
+                { Icon: Linkedin, label: 'LinkedIn' },
+                { Icon: Mail, label: 'Email' },
+              ].map(({ Icon, label }) => (
+                <Link
+                  key={label}
+                  href="#"
+                  aria-label={label}
+                  className="flex size-11 items-center justify-center rounded-full bg-foreground/[0.06] transition-all duration-300 ease-(--ease-pop) hover:-translate-y-1 hover:scale-110 hover:bg-brand hover:text-brand-foreground"
+                >
+                  <Icon className="size-[18px]" />
                 </Link>
               ))}
             </div>
           </div>
 
-            <div>
-              <h4 className="text-sm font-bold uppercase tracking-widest mb-8 text-zinc-400">Platform</h4>
-              <ul className="space-y-4">
-                {['Features', 'Integrations', 'Changelog', 'Roadmap'].map((item) => (
-                  <li key={item}>
-                    <Link href="#" className="text-zinc-500 hover:text-black dark:hover:text-white transition-colors">{item}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div>
+            <h4 className="mb-6 text-xs font-bold tracking-widest text-muted-foreground uppercase">Platform</h4>
+            <ul className="space-y-3.5">
+              {['Features', 'Integrations', 'Changelog', 'Roadmap'].map((item) => (
+                <li key={item}><Link href="#" className={linkCls}>{item}</Link></li>
+              ))}
+            </ul>
+          </div>
 
           <div>
-            <h4 className="text-sm font-bold uppercase tracking-widest mb-8 text-zinc-400">Company</h4>
-            <ul className="space-y-4">
+            <h4 className="mb-6 text-xs font-bold tracking-widest text-muted-foreground uppercase">Company</h4>
+            <ul className="space-y-3.5">
               {['About', 'Privacy', 'Terms', 'Security', 'Contact'].map((item) => (
-                <li key={item}>
-                  <Link href="#" className="text-zinc-500 hover:text-black dark:hover:text-white transition-colors">{item}</Link>
-                </li>
+                <li key={item}><Link href="#" className={linkCls}>{item}</Link></li>
               ))}
             </ul>
           </div>
         </div>
 
-        <div className="pt-12 border-t border-zinc-100 dark:border-zinc-900 flex flex-col md:flex-row items-center justify-between gap-8">
-          <p className="text-zinc-500 text-sm">
-            © 2026 Cognify Labs. Built with passion for the digital universe.
-          </p>
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-foreground/[0.08] pt-8 md:flex-row">
+          <p className="text-sm text-muted-foreground">© 2026 Cognify Labs. Built with passion for the digital universe.</p>
         </div>
       </div>
     </footer>

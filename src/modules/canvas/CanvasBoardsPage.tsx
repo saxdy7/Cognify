@@ -53,8 +53,8 @@ export function CanvasBoardsPage() {
         actions={
           <>
             <div className="relative w-full sm:w-64">
-              <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search boards…" className="h-8 pl-8" />
+              <Search className="absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search boards…" className="pl-10" />
             </div>
             <Button variant="outline" size="icon" onClick={() => setSort((s) => (s === 'desc' ? 'asc' : 'desc'))} title={`Sorted by last edited (${sort === 'desc' ? 'newest' : 'oldest'} first)`}>
               {sort === 'desc' ? <SortDesc /> : <SortAsc />}

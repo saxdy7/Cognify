@@ -85,8 +85,8 @@ export function DocsPage() {
           </TabsList>
         </Tabs>
         <div className="relative w-full sm:w-64">
-          <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pages…" className="h-8 pl-8" />
+          <Search className="absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pages…" className="pl-10" />
         </div>
       </div>
 

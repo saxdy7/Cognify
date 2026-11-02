@@ -56,7 +56,18 @@ export function PageHeader({ title, description, icon: Icon, iconClassName, stat
           </ul>
         )}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && (
+        <div
+          className={cn(
+            'flex shrink-0 flex-wrap items-center gap-2',
+            // One size for every header action, whatever the page asked for (matches Overview's large pills)
+            '[&_[data-slot=button]:not([data-size^=icon])]:h-11 [&_[data-slot=button]:not([data-size^=icon])]:px-6 [&_[data-slot=button]:not([data-size^=icon])]:text-[15px]',
+            '[&_[data-slot=button][data-size^=icon]]:size-11 [&_[data-slot=input]]:h-11',
+          )}
+        >
+          {actions}
+        </div>
+      )}
     </Reveal>
   );
 }

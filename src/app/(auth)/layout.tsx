@@ -1,11 +1,11 @@
-import { BackgroundBeams } from '@/components/motion/BackgroundBeams';
+import { UrbanistScope } from '@/components/site/UrbanistScope';
 
-// Auth screens share the marketing look (dark, beams) rather than the app shell.
+// Sign-in / sign-up share the marketing skin and follow the visitor's theme.
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="dark relative min-h-screen bg-black text-white">
-      <BackgroundBeams />
-      <div className="relative z-10">{children}</div>
+    <div className="app-ui relative min-h-svh text-foreground">
+      <UrbanistScope />
+      {children}
     </div>
   );
 }

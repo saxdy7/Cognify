@@ -95,28 +95,46 @@ export function SplitReveal({
   className,
   delay = 0,
   as: Tag = 'span',
+  inView = false,
 }: {
   text: string;
   className?: string;
   delay?: number;
   as?: 'span' | 'h1' | 'h2';
+  /** Play when scrolled into view instead of on mount (below-the-fold headings). */
+  inView?: boolean;
 }) {
   const reduce = useReducedMotion();
   const words = text.split(' ');
   return (
     <Tag className={className} aria-label={text}>
       {words.map((w, i) => (
-        <span key={i} aria-hidden className="inline-block overflow-hidden pb-[0.12em] align-bottom">
+        // The observer sits on the mask (it never moves). Observing the word itself fails:
+        // it starts translated fully out of its own overflow-hidden mask, so it is "not visible".
+        <motion.span
+          key={i}
+          aria-hidden
+          className="inline-block overflow-hidden pb-[0.12em] align-bottom"
+          initial={reduce ? 'visible' : 'hidden'}
+          {...(inView
+            ? { whileInView: 'visible', viewport: { once: true, amount: 'some' as const } }
+            : { animate: 'visible' })}
+        >
           <motion.span
             className="inline-block origin-bottom-left"
-            initial={reduce ? false : { y: '115%', rotate: 6 }}
-            animate={{ y: '0%', rotate: 0 }}
-            transition={{ duration: 0.85, delay: delay + i * 0.045, ease: [0.16, 1, 0.3, 1] }}
+            variants={{
+              hidden: { y: '115%', rotate: 6 },
+              visible: {
+                y: '0%',
+                rotate: 0,
+                transition: { duration: 0.85, delay: delay + i * 0.045, ease: [0.16, 1, 0.3, 1] },
+              },
+            }}
           >
             {w}
             {i < words.length - 1 ? ' ' : ''}
           </motion.span>
-        </span>
+        </motion.span>
       ))}
     </Tag>
   );

@@ -1,11 +1,12 @@
-import { BackgroundBeams } from '@/components/motion/BackgroundBeams';
+import { UrbanistScope } from '@/components/site/UrbanistScope';
 
-// Marketing pages are intentionally dark-only (brand look); the app itself follows the user's theme.
+// Marketing pages share the app's skin (mesh ground, Urbanist, frosted cards) and now follow the
+// visitor's theme — light by default on light systems, ink in dark mode — instead of forcing dark.
 export default function WebLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="dark relative min-h-screen bg-black text-white">
-      <BackgroundBeams />
-      <div className="relative z-10">{children}</div>
+    <div className="app-ui relative min-h-screen text-foreground">
+      <UrbanistScope />
+      {children}
     </div>
   );
 }
