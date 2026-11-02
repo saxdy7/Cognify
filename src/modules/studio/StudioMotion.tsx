@@ -44,9 +44,13 @@ export function StudioScroller({ children }: { children: React.ReactNode }) {
     let lenis: Lenis | null = null;
     // Inside the dashboard shell we own the scroller; anywhere else the global Lenis (or native scroll) already does.
     if (wrapper && !reduce) {
-      lenis = new Lenis({ wrapper, content: wrapper.firstElementChild as HTMLElement, eventsTarget: wrapper, autoRaf: true, duration: 1.05, easing: lenisEase, smoothWheel: true, wheelMultiplier: 0.9 });
+      // `content` must be an element whose height follows the page. The shell's own wrapper is fixed to the screen height, so measuring it would freeze the scroll limit.
+      lenis = new Lenis({ wrapper, content: root, eventsTarget: wrapper, autoRaf: true, duration: 1.05, easing: lenisEase, smoothWheel: true, wheelMultiplier: 0.9 });
       lenisRef.current = lenis;
     }
+    // Pages grow after mount (view switches, data arriving): keep Lenis's limit in step.
+    const sizeObserver = lenis ? new ResizeObserver(() => lenis?.resize()) : null;
+    sizeObserver?.observe(root);
 
     let parallaxEls: HTMLElement[] = [];
     let skewEls: HTMLElement[] = [];
@@ -98,6 +102,7 @@ export function StudioScroller({ children }: { children: React.ReactNode }) {
 
     return () => {
       observer.disconnect();
+      sizeObserver?.disconnect();
       root.removeEventListener('pointermove', onPointer);
       target.removeEventListener('scroll', onNative);
       lenis?.destroy();
