@@ -3,9 +3,9 @@
 import React from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
-import { emptyStudioData, MEMBER_COLORS, memberId } from './data';
-import { todayISO } from './dates';
-import type { Deal, DealStage, Deliverable, Expense, Invoice, StudioData, StudioProject, StudioTask } from './types';
+import { DEFAULT_STEPS, emptyStudioData, MEMBER_COLORS, memberId } from './data';
+import { addDaysISO, todayISO } from './dates';
+import type { Deal, DealStage, Deliverable, Expense, Invoice, StudioData, StudioProject, StudioTask, WorkKind } from './types';
 
 const STORAGE_KEY = 'cognify:studio-data:v5-live';
 const META_KEY = 'cognify:studio-meta:v1';
@@ -45,7 +45,8 @@ interface StudioContextValue extends StudioData {
   /** Move a deal into a stage at a precise slot: before `beforeId`, or at the end of the stage when omitted. */
   placeDeal: (id: string, stage: DealStage, beforeId?: string | null) => void;
   closeDeal: (id: string, outcome: 'won' | 'lost') => void;
-  restoreDeal: (id: string) => void;
+  /** Reopen a closed deal. Removes the project and unpaid invoice that winning created, unless work has started on them. */
+  reopenDeal: (id: string, snapshot?: Partial<Deal>) => void;
   addTask: (task: Omit<StudioTask, 'id' | 'completed'>) => void;
   updateTask: (id: string, patch: Partial<StudioTask>) => void;
   addProject: (project: Omit<StudioProject, 'id'>) => void;
@@ -64,9 +65,12 @@ interface StudioContextValue extends StudioData {
 
 const StudioContext = React.createContext<StudioContextValue | null>(null);
 
+const stepsFor = (kind: WorkKind) => DEFAULT_STEPS[kind].map((title, index) => ({ id: `step-${Date.now().toString(36)}-${index}-${Math.random().toString(36).slice(2, 5)}`, title, completed: false }));
+const nextInvoiceId = (invoices: Invoice[]) => `INV-${invoices.reduce((max, item) => Math.max(max, Number(item.id.replace(/\D/g, '')) || 0), 1000) + 1}`;
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-export function StudioProvider({ children }: { children: React.ReactNode }) {
+/** `cloud={false}` keeps everything on this device (used by the login-free test page so it can never touch an account). */
+export function StudioProvider({ children, cloud = true }: { children: React.ReactNode; cloud?: boolean }) {
   const [data, setData] = React.useState<StudioData>(emptyStudioData);
   const [hydrated, setHydrated] = React.useState(false);
 
@@ -101,6 +105,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         toast.error('Studio data could not be restored');
       }
       setHydrated(true);
+      if (!cloud) { setSync('local'); return; }
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -141,7 +146,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [push]);
+  }, [push, cloud]);
 
   // Every change: write the local copy now, push to the database a moment later.
   React.useEffect(() => {
@@ -204,7 +209,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteDeal = React.useCallback((id: string) => {
-    setData((current) => ({ ...current, deals: current.deals.filter((deal) => deal.id !== id) }));
+    // Money and work already created stay — they just stop pointing at a deal that no longer exists.
+    setData((current) => ({
+      ...current,
+      deals: current.deals.filter((deal) => deal.id !== id),
+      projects: current.projects.map((project) => project.dealId === id ? { ...project, dealId: undefined } : project),
+      invoices: current.invoices.map((invoice) => invoice.dealId === id ? { ...invoice, dealId: undefined } : invoice),
+    }));
   }, []);
 
   const moveDeal = React.useCallback((id: string, stage: DealStage) => {
@@ -231,11 +242,43 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const closeDeal = React.useCallback((id: string, outcome: 'won' | 'lost') => {
-    setData((current) => ({ ...current, deals: current.deals.map((deal) => deal.id === id ? { ...deal, outcome, probability: outcome === 'won' ? 100 : 0, closedAt: todayISO() } : deal) }));
+    setData((current) => {
+      const deal = current.deals.find((item) => item.id === id);
+      if (!deal) return current;
+      const today = todayISO();
+      const closed: Deal = { ...deal, outcome, probability: outcome === 'won' ? 100 : 0, closedAt: today };
+      if (outcome === 'lost') return { ...current, deals: current.deals.map((item) => item.id === id ? closed : item) };
+
+      // A win starts the work and the billing, once.
+      let projects = current.projects;
+      let invoices = current.invoices;
+      let projectId = projects.find((project) => project.id === deal.projectId || project.dealId === id)?.id;
+      if (!projectId) {
+        const steps = stepsFor(deal.kind);
+        const project: StudioProject = { id: makeId('project'), title: deal.title, client: deal.client, kind: deal.kind, status: 'Active', progress: 0, budget: deal.value, dueDate: deal.dueDate > today ? deal.dueDate : addDaysISO(today, 30), owner: deal.owner, team: [deal.owner], tasksDone: 0, tasksTotal: steps.length, steps, dealId: id };
+        projects = [project, ...projects];
+        projectId = project.id;
+      }
+      if (!invoices.some((invoice) => invoice.dealId === id)) {
+        invoices = [{ id: nextInvoiceId(invoices), client: deal.client, project: deal.title, amount: deal.value, issuedAt: today, dueAt: addDaysISO(today, 14), status: 'Due', dealId: id, projectId }, ...invoices];
+      }
+      return { ...current, projects, invoices, deals: current.deals.map((item) => item.id === id ? { ...closed, projectId } : item) };
+    });
   }, []);
 
-  const restoreDeal = React.useCallback((id: string) => {
-    setData((current) => ({ ...current, deals: current.deals.map((deal) => deal.id === id ? { ...deal, outcome: 'open', closedAt: undefined, probability: Math.max(20, deal.probability) } : deal) }));
+  const reopenDeal = React.useCallback((id: string, snapshot?: Partial<Deal>) => {
+    setData((current) => {
+      const deal = current.deals.find((item) => item.id === id);
+      if (!deal) return current;
+      const project = current.projects.find((item) => item.dealId === id);
+      const untouched = Boolean(project) && project!.tasksDone === 0 && !current.deliverables.some((item) => item.projectId === project!.id);
+      return {
+        ...current,
+        projects: untouched ? current.projects.filter((item) => item.id !== project!.id) : current.projects,
+        invoices: current.invoices.filter((invoice) => !(invoice.dealId === id && invoice.status !== 'Paid')),
+        deals: current.deals.map((item) => item.id === id ? { ...item, outcome: 'open' as const, closedAt: undefined, probability: Math.max(20, item.probability), projectId: untouched ? undefined : item.projectId, ...(snapshot ?? {}) } : item),
+      };
+    });
   }, []);
 
   const addTask = React.useCallback((task: Omit<StudioTask, 'id' | 'completed'>) => {
@@ -248,8 +291,21 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addProject = React.useCallback((project: Omit<StudioProject, 'id'>) => {
-    setData((current) => ({ ...current, projects: [{ ...project, id: makeId('project') }, ...current.projects] }));
-    toast.success('Project created');
+    setData((current) => {
+      const id = makeId('project');
+      const today = todayISO();
+      let deals = current.deals;
+      let invoices = current.invoices;
+      let dealId = project.dealId;
+      if (!dealId) {
+        // Work that starts in Projects shows up on the pipeline as a won deal, and gets its first invoice.
+        dealId = makeId('deal');
+        deals = [{ id: dealId, title: project.title, client: project.client, kind: project.kind, stage: 'won', value: project.budget, probability: 100, owner: project.owner, dueDate: project.dueDate, source: 'Direct', nextAction: 'Project started', outcome: 'won', closedAt: today, createdAt: today, projectId: id }, ...deals];
+        invoices = [{ id: nextInvoiceId(invoices), client: project.client, project: project.title, amount: project.budget, issuedAt: today, dueAt: addDaysISO(today, 14), status: 'Due', dealId, projectId: id }, ...invoices];
+      }
+      return { ...current, deals, invoices, projects: [{ ...project, id, dealId }, ...current.projects] };
+    });
+    toast.success('Project created — added to the pipeline and to finance');
   }, []);
 
   const updateProject = React.useCallback((id: string, patch: Partial<StudioProject>) => {
@@ -257,7 +313,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteProject = React.useCallback((id: string) => {
-    setData((current) => ({ ...current, projects: current.projects.filter((project) => project.id !== id), deliverables: current.deliverables.filter((deliverable) => deliverable.projectId !== id) }));
+    setData((current) => ({
+      ...current,
+      projects: current.projects.filter((project) => project.id !== id),
+      deliverables: current.deliverables.filter((deliverable) => deliverable.projectId !== id),
+      deals: current.deals.map((deal) => deal.projectId === id ? { ...deal, projectId: undefined } : deal),
+      invoices: current.invoices.map((invoice) => invoice.projectId === id ? { ...invoice, projectId: undefined } : invoice),
+    }));
     toast.success('Project deleted');
   }, []);
 
@@ -276,8 +338,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
 
   const addInvoice = React.useCallback((invoice: Omit<Invoice, 'id'>) => {
     setData((current) => {
-      const highest = current.invoices.reduce((max, item) => Math.max(max, Number(item.id.replace(/\D/g, '')) || 0), 1000);
-      return { ...current, invoices: [{ ...invoice, id: `INV-${highest + 1}` }, ...current.invoices] };
+      // An invoice for an existing project attaches to it (and to its deal), so every page agrees.
+      const match = invoice.projectId ? undefined : current.projects.find((project) => project.client.toLowerCase() === invoice.client.toLowerCase() && project.title.toLowerCase() === invoice.project.toLowerCase());
+      const link = match ? { projectId: match.id, dealId: match.dealId } : {};
+      return { ...current, invoices: [{ ...invoice, ...link, id: nextInvoiceId(current.invoices) }, ...current.invoices] };
     });
     toast.success('Invoice created');
   }, []);
@@ -307,14 +371,14 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo<StudioContextValue>(() => ({
     ...data, hydrated, sync,
     addTeamMember, removeTeamMember,
-    addDeal, updateDeal, deleteDeal, moveDeal, placeDeal, closeDeal, restoreDeal,
+    addDeal, updateDeal, deleteDeal, moveDeal, placeDeal, closeDeal, reopenDeal,
     addTask, updateTask,
     addProject, updateProject, deleteProject,
     addDeliverable, updateDeliverable, deleteDeliverable,
     addInvoice, updateInvoice, deleteInvoice,
     addExpense, deleteExpense,
     clearStudio,
-  }), [data, hydrated, sync, addTeamMember, removeTeamMember, addDeal, updateDeal, deleteDeal, moveDeal, placeDeal, closeDeal, restoreDeal, addTask, updateTask, addProject, updateProject, deleteProject, addDeliverable, updateDeliverable, deleteDeliverable, addInvoice, updateInvoice, deleteInvoice, addExpense, deleteExpense, clearStudio]);
+  }), [data, hydrated, sync, addTeamMember, removeTeamMember, addDeal, updateDeal, deleteDeal, moveDeal, placeDeal, closeDeal, reopenDeal, addTask, updateTask, addProject, updateProject, deleteProject, addDeliverable, updateDeliverable, deleteDeliverable, addInvoice, updateInvoice, deleteInvoice, addExpense, deleteExpense, clearStudio]);
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
 }

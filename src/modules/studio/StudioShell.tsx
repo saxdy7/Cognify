@@ -135,6 +135,6 @@ function StudioContent({ view }: { view: StudioView }) {
   );
 }
 
-export function StudioPage({ view = 'overview' }: { view?: StudioView }) {
-  return <StudioProvider><StudioContent view={view} /></StudioProvider>;
+export function StudioPage({ view = 'overview', cloud = true }: { view?: StudioView; cloud?: boolean }) {
+  return <StudioProvider cloud={cloud}><StudioContent view={view} /></StudioProvider>;
 }

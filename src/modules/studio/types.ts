@@ -1,6 +1,7 @@
 export type DealStage = 'lead' | 'proposal' | 'negotiation' | 'won';
 export type WorkKind = 'Video production' | 'Full-stack development' | 'Mobile app' | 'Brand design' | 'Content system';
-export type TaskType = 'Call' | 'Meeting' | 'Task' | 'Email';
+/** Call/Meeting/Task/Email are entered by hand; Payment/Delivery/Deal are generated from invoices, projects and deals. */
+export type TaskType = 'Call' | 'Meeting' | 'Task' | 'Email' | 'Payment' | 'Delivery' | 'Deal';
 export type ProjectStatus = 'Planning' | 'Active' | 'Review' | 'Complete';
 
 export interface Deal {
@@ -20,6 +21,8 @@ export interface Deal {
   closedAt?: string;
   /** ISO date the deal was added — with closedAt it gives the sales cycle. */
   createdAt?: string;
+  /** Project created automatically when this deal was won (or that this deal was created from). */
+  projectId?: string;
 }
 
 export interface StudioTask {
@@ -32,6 +35,8 @@ export interface StudioTask {
   type: TaskType;
   owner: string;
   completed: boolean;
+  /** Generated from an invoice, project or deal — shown on the schedule but edited at its source. */
+  auto?: boolean;
   priority?: 'Normal' | 'High';
   reminderMinutes?: number;
   notes?: string;
@@ -53,6 +58,8 @@ export interface StudioProject {
   steps?: ProjectStep[];
   contactName?: string;
   contactRole?: string;
+  /** The won deal this project delivers. */
+  dealId?: string;
 }
 
 export interface ProjectStep {
@@ -71,6 +78,8 @@ export interface Invoice {
   status: 'Paid' | 'Due' | 'Overdue';
   /** ISO date the invoice was paid — places the revenue in the right month. */
   paidAt?: string;
+  dealId?: string;
+  projectId?: string;
 }
 
 export interface Deliverable {

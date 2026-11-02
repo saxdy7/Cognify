@@ -29,12 +29,12 @@ const SECTIONS = [
 ];
 
 export function GrowthDashboard() {
-  const { deals } = useStudio();
+  const { deals, invoices } = useStudio();
   const router = useRouter();
   const [period, setPeriod] = React.useState<Period>(6);
   const [mode, setMode] = React.useState<RevenueMode>('value');
   const [hoveredMonth, setHoveredMonth] = React.useState<number | null>(null);
-  const report = React.useMemo(() => growthReport(deals, period), [deals, period]);
+  const report = React.useMemo(() => growthReport(deals, invoices, period), [deals, invoices, period]);
   const visible = report.months;
   const { revenue } = report;
   const enterprise = visible.reduce((sum, month) => sum + month.enterprise, 0);

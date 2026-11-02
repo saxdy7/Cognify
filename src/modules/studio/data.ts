@@ -42,6 +42,9 @@ export const TASK_TONES = {
   Meeting: 'bg-[#ff9a83] text-[#35140d] dark:bg-[#b45f50] dark:text-white',
   Task: 'bg-stone-200 text-stone-950 dark:bg-stone-600 dark:text-white',
   Email: 'bg-sky-300 text-sky-950 dark:bg-sky-600 dark:text-white',
+  Payment: 'bg-emerald-300 text-emerald-950 dark:bg-emerald-600 dark:text-white',
+  Delivery: 'bg-violet-300 text-violet-950 dark:bg-violet-600 dark:text-white',
+  Deal: 'bg-amber-200 text-amber-950 dark:bg-amber-600 dark:text-white',
 } as const;
 
 export const PROJECT_TONES = {
@@ -63,7 +66,7 @@ export const DEFAULT_STEPS: Record<WorkKind, string[]> = {
   'Content system': ['Content audit', 'Strategy', 'Templates', 'Production', 'Review', 'Handover'],
 };
 
-export const DEAL_SOURCES = ['Referral', 'Website', 'Instagram', 'LinkedIn', 'WhatsApp', 'Returning client', 'Outbound', 'Event', 'Other'] as const;
+export const DEAL_SOURCES = ['Referral', 'Website', 'Instagram', 'LinkedIn', 'WhatsApp', 'Returning client', 'Outbound', 'Event', 'Direct', 'Other'] as const;
 
 /** Segment by deal size so Growth can split revenue the way the reference does. */
 export type Segment = 'Enterprise' | 'Mid-market' | 'SMB';

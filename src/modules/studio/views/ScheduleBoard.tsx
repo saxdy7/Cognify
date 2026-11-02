@@ -3,11 +3,13 @@
 import React from 'react';
 import { addDays, addMonths, addWeeks, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
 import { CalendarCheck2, Check, ChevronLeft, ChevronRight, CircleCheck, Clock3, Copy, Ellipsis, Eye, GripVertical, ListFilter, Plus, Search, Sparkles, Zap } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { TASK_TONES } from '../data';
+import { autoScheduleEvents } from '../analytics';
 import { NewTaskDialog } from '../StudioDialogs';
 import { useStudio } from '../StudioProvider';
 import { PersonBadge } from '../StudioUi';
@@ -16,12 +18,14 @@ import type { StudioTask, TaskType } from '../types';
 const START_HOUR = 8;
 const END_HOUR = 18;
 const HOUR_HEIGHT = 66;
-const TYPES: TaskType[] = ['Call', 'Meeting', 'Task', 'Email'];
+const TYPES: TaskType[] = ['Call', 'Meeting', 'Task', 'Email', 'Payment', 'Delivery', 'Deal'];
 const TODAY = (() => { const date = new Date(); date.setHours(12, 0, 0, 0); return date; })();
 type CalendarView = 'month' | 'week';
 
 export function ScheduleBoard() {
-  const { tasks, team, addTask, updateTask } = useStudio();
+  const { tasks: manualTasks, deals, projects, invoices, team, addTask, updateTask } = useStudio();
+  // Hand-entered tasks plus payments, deliveries and closing dates generated from Finance, Projects and Pipeline.
+  const tasks = React.useMemo(() => [...manualTasks, ...autoScheduleEvents(deals, projects, invoices, team[0]?.id ?? 'ME')], [manualTasks, deals, projects, invoices, team]);
   const [cursorDate, setCursorDate] = React.useState(TODAY);
   const [selectedDate, setSelectedDate] = React.useState(TODAY);
   const [view, setView] = React.useState<CalendarView>('month');
@@ -216,11 +220,11 @@ function MonthCalendar({ days, columnCount, cursorDate, selectedDate, tasks, com
 function MonthTask({ task }: { task: StudioTask }) {
   return (
     <span
-      draggable
+      draggable={!task.auto}
       onDragStart={(event) => { event.stopPropagation(); event.dataTransfer.setData('text/cognify-task', task.id); event.dataTransfer.effectAllowed = 'move'; }}
       onClick={(event) => event.stopPropagation()}
       title={`${task.title} · ${task.client}`}
-      className={cn('flex h-6 cursor-grab items-center gap-1 rounded-lg bg-foreground/[0.055] px-1.5 text-[10px] font-semibold active:cursor-grabbing', task.completed && 'opacity-45 line-through')}
+      className={cn('flex h-6 cursor-grab items-center gap-1 rounded-lg bg-foreground/[0.055] px-1.5 text-[10px] font-semibold active:cursor-grabbing', task.auto && 'cursor-default border border-dashed border-foreground/25 active:cursor-default', task.completed && 'opacity-45 line-through')}
     >
       <GripVertical className="hidden size-3 shrink-0 opacity-0 transition-opacity group-hover:inline group-hover:opacity-50 xl:inline" />
       <span className={cn('size-1.5 shrink-0 rounded-full', typeDot(task.type))} />
@@ -292,7 +296,7 @@ function DayColumn({ tasks, selected, startHour, onSelect, onToggle }: { tasks: 
         const height = Math.max(40, task.duration / 60 * HOUR_HEIGHT - 4);
         const width = 100 / groupSize(task);
         return (
-          <button key={task.id} onClick={(event) => { event.stopPropagation(); onToggle(task.id, !task.completed); }} className={cn('absolute z-10 overflow-hidden rounded-xl px-2.5 py-2 text-left shadow-sm ring-1 ring-black/5 transition-transform hover:z-20 hover:scale-[1.02]', TASK_TONES[task.type], task.completed && 'opacity-45 line-through')} style={{ top, height, left: `calc(${lane * width}% + 4px)`, width: `calc(${width}% - 8px)` }} title={`${task.title} — ${task.client}`}>
+          <button key={task.id} onClick={(event) => { event.stopPropagation(); onToggle(task.id, !task.completed); }} className={cn('absolute z-10 overflow-hidden rounded-xl px-2.5 py-2 text-left shadow-sm ring-1 ring-black/5 transition-transform hover:z-20 hover:scale-[1.02]', TASK_TONES[task.type], task.auto && 'border border-dashed border-foreground/40', task.completed && 'opacity-45 line-through')} style={{ top, height, left: `calc(${lane * width}% + 4px)`, width: `calc(${width}% - 8px)` }} title={`${task.title} — ${task.client}`}>
             <span className="block truncate text-[9px] font-medium opacity-70">{minutesToTime(task.startMinutes)} · {task.client}</span>
             <span className="mt-0.5 block truncate text-[10px] font-bold">{task.title}</span>
             <span className="absolute top-1.5 right-1.5"><PersonBadge id={task.owner} size="sm" /></span>
@@ -303,7 +307,21 @@ function DayColumn({ tasks, selected, startHour, onSelect, onToggle }: { tasks: 
   );
 }
 
+const SOURCE_LINK = (task: StudioTask) => task.id.startsWith('auto-invoice') ? { href: '/dashboard/studio/finance', label: 'Open in Finance' } : task.id.startsWith('auto-project') ? { href: '/dashboard/studio/projects', label: 'Open in Projects' } : { href: '/dashboard/studio/pipeline', label: 'Open in Pipeline' };
+
 function AgendaTask({ task, onToggle, onMoveTomorrow, onDuplicate, compact }: { task: StudioTask; onToggle: () => void; onMoveTomorrow: () => void; onDuplicate: () => void; compact?: boolean; }) {
+  if (task.auto) {
+    const link = SOURCE_LINK(task);
+    return (
+      <article className={cn('rounded-2xl border border-dashed border-foreground/20 bg-foreground/[0.03] p-3 transition-colors hover:bg-foreground/[0.05]', task.completed && 'opacity-60')}>
+        <div className="flex items-start gap-2.5">
+          <span className={cn('mt-1 flex size-5 shrink-0 items-center justify-center rounded-full', TASK_TONES[task.type].split(' ').slice(0, 2).join(' '))}>{task.completed ? <Check className="size-3" /> : <span className="size-1.5 rounded-full bg-current" />}</span>
+          <div className="min-w-0 flex-1"><p className={cn('text-[11px] font-bold', task.completed && 'line-through')}>{task.title}</p><p className="mt-1 truncate text-[9px] text-muted-foreground">{task.type} · {task.client}</p>{!compact && task.notes && <p className="mt-1 text-[9px] text-muted-foreground">{task.notes}</p>}<Link href={link.href} className="mt-1.5 inline-block text-[9px] font-semibold text-foreground/70 underline-offset-2 hover:underline">{link.label} →</Link></div>
+          <PersonBadge id={task.owner} size="sm" />
+        </div>
+      </article>
+    );
+  }
   return (
     <article className={cn('rounded-2xl bg-foreground/[0.035] p-3 ring-1 ring-foreground/[0.09] transition-colors hover:bg-foreground/[0.055]', task.completed && 'opacity-55')}>
       <div className="flex items-start gap-2.5">
@@ -319,6 +337,6 @@ function AgendaTask({ task, onToggle, onMoveTomorrow, onDuplicate, compact }: { 
   );
 }
 
-function typeDot(type: TaskType) { return { Call: 'bg-lime-400', Meeting: 'bg-[#ff8f78]', Task: 'bg-stone-300', Email: 'bg-sky-400' }[type]; }
+function typeDot(type: TaskType) { return { Call: 'bg-lime-400', Meeting: 'bg-[#ff8f78]', Task: 'bg-stone-300', Email: 'bg-sky-400', Payment: 'bg-emerald-400', Delivery: 'bg-violet-400', Deal: 'bg-amber-400' }[type]; }
 function minutesToTime(minutes: number, compact = false) { const hour = Math.floor(minutes / 60); const minute = minutes % 60; const suffix = hour >= 12 ? 'PM' : 'AM'; const minuteText = minute ? `:${String(minute).padStart(2, '0')}` : ''; return compact ? `${hour % 12 || 12}${minuteText}${suffix.toLowerCase()}` : `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`; }
 function formatHour(hour: number) { return `${hour % 12 || 12} ${hour >= 12 ? 'PM' : 'AM'}`; }

@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { STAGE_META } from '../data';
-import { NewDealDialog, NewProjectDialog, type ProjectPrefill } from '../StudioDialogs';
+import Link from 'next/link';
+import { NewDealDialog } from '../StudioDialogs';
 import { AnimatedNumber } from '../StudioMotion';
 import { useStudio } from '../StudioProvider';
 import { currency, EmptyState, PageIntro, PersonBadge, shortDate } from '../StudioUi';
-import type { Deal, DealStage } from '../types';
+import type { Deal, DealStage, Invoice } from '../types';
 
 const STAGES: DealStage[] = ['lead', 'proposal', 'negotiation', 'won'];
 type PipelineView = 'board' | 'list';
@@ -23,9 +24,10 @@ type Zone = 'won' | 'lost';
 const compact = (n: number) => currency(n, true);
 
 export function PipelineBoard() {
-  const { deals, team, placeDeal, closeDeal, updateDeal, deleteDeal } = useStudio();
-  const [projectPrefill, setProjectPrefill] = React.useState<ProjectPrefill | null>(null);
-  const [projectOpen, setProjectOpen] = React.useState(false);
+  const { deals, invoices, team, placeDeal, closeDeal, reopenDeal, updateDeal, deleteDeal } = useStudio();
+  const [closedView, setClosedView] = React.useState<Zone | null>(null);
+  // Mirrors draggingId synchronously so a drop never races the React state update.
+  const draggingRef = React.useRef<string | null>(null);
   const reduce = useReducedMotion();
   const [newOpen, setNewOpen] = React.useState(false);
   const [newStage, setNewStage] = React.useState<DealStage>('lead');
@@ -50,7 +52,7 @@ export function PipelineBoard() {
   const closingValue = closingThisMonth.reduce((sum, deal) => sum + deal.value, 0);
 
   const openNewDeal = (stage: DealStage = 'lead') => { setNewStage(stage); setNewOpen(true); };
-  const resetDrag = () => { setDraggingId(null); setOverStage(null); setOverBefore(null); setOverZone(null); };
+  const resetDrag = () => { draggingRef.current = null; setDraggingId(null); setOverStage(null); setOverBefore(null); setOverZone(null); };
 
   /** The deal that follows `id` inside its own stage — used to put a card back exactly where it was. */
   const nextSibling = (id: string) => {
@@ -75,10 +77,9 @@ export function PipelineBoard() {
     if (!deal) return;
     const snapshot = { outcome: deal.outcome, probability: deal.probability, stage: deal.stage, closedAt: deal.closedAt };
     closeDeal(dealId, outcome);
-    toast.success(outcome === 'won' ? `${deal.title} marked won` : `${deal.title} marked lost`, {
-      action: { label: 'Undo', onClick: () => updateDeal(dealId, snapshot) },
-      // A win is the natural moment to start delivery: prefill a project from the deal.
-      ...(outcome === 'won' ? { cancel: { label: 'Create project', onClick: () => { setProjectPrefill({ title: deal.title, client: deal.client, kind: deal.kind, budget: deal.value, owner: deal.owner }); setProjectOpen(true); } } } : {}),
+    toast.success(outcome === 'won' ? `${deal.title} won — project and invoice created` : `${deal.title} marked lost`, {
+      description: outcome === 'won' ? 'Find it in Projects, Finance and the Schedule.' : undefined,
+      action: { label: 'Undo', onClick: () => reopenDeal(dealId, snapshot) },
     });
   };
 
@@ -120,9 +121,10 @@ export function PipelineBoard() {
   };
 
   const zoneHandlers = (zone: Zone) => ({
-    onDragOver: (event: React.DragEvent<HTMLElement>) => { if (!draggingId) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (overZone !== zone) { setOverZone(zone); setOverStage(null); setOverBefore(null); } },
+    onDragEnter: (event: React.DragEvent<HTMLElement>) => { if (draggingRef.current) event.preventDefault(); },
+    onDragOver: (event: React.DragEvent<HTMLElement>) => { if (!draggingRef.current) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (overZone !== zone) { setOverZone(zone); setOverStage(null); setOverBefore(null); } },
     onDragLeave: (event: React.DragEvent<HTMLElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOverZone(null); },
-    onDrop: (event: React.DragEvent<HTMLElement>) => { event.preventDefault(); const id = draggingId ?? event.dataTransfer.getData('text/plain'); resetDrag(); if (id) closeWithUndo(id, zone); },
+    onDrop: (event: React.DragEvent<HTMLElement>) => { event.preventDefault(); const id = draggingRef.current ?? draggingId ?? event.dataTransfer.getData('text/plain'); resetDrag(); if (id) closeWithUndo(id, zone); },
   });
 
   return (
@@ -168,7 +170,7 @@ export function PipelineBoard() {
                       ...stageDeals.flatMap((deal) => [
                         ...(isOver && overBefore === deal.id && deal.id !== draggingId ? [dropGap(`gap-${deal.id}`)] : []),
                         <motion.div key={deal.id} data-deal-id={deal.id} layout={!reduce} initial={reduce ? false : { opacity: 0, scale: 0.94, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduce ? undefined : { opacity: 0, scale: 0.92 }} transition={{ type: 'spring', stiffness: 460, damping: 36, mass: 0.7 }}>
-                          <DealCard deal={deal} active={selectedId === deal.id} dragging={draggingId === deal.id} onSelect={() => setSelectedId(deal.id)} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', deal.id); setDraggingId(deal.id); }} onDragEnd={resetDrag} onMove={(nextStage) => moveWithUndo(deal.id, nextStage)} onClose={(outcome) => closeWithUndo(deal.id, outcome)} onDelete={() => { deleteDeal(deal.id); toast.success("Deal deleted"); }} />
+                          <DealCard deal={deal} active={selectedId === deal.id} dragging={draggingId === deal.id} onSelect={() => setSelectedId(deal.id)} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', deal.id); draggingRef.current = deal.id; setDraggingId(deal.id); }} onDragEnd={resetDrag} onMove={(nextStage) => moveWithUndo(deal.id, nextStage)} onClose={(outcome) => closeWithUndo(deal.id, outcome)} onDelete={() => { deleteDeal(deal.id); toast.success("Deal deleted"); }} />
                         </motion.div>,
                       ]),
                       ...(isOver && overBefore === null ? [dropGap('gap-end')] : []),
@@ -180,8 +182,8 @@ export function PipelineBoard() {
             );
           })}
           <div className="grid min-w-[110px] grid-rows-2 gap-3">
-            <OutcomeDropZone type="won" deals={wonDeals} value={wonDeals.reduce((sum, deal) => sum + deal.value, 0)} dragging={Boolean(draggingId)} over={overZone === 'won'} handlers={zoneHandlers('won')} />
-            <OutcomeDropZone type="lost" deals={lostDeals} value={lostDeals.reduce((sum, deal) => sum + deal.value, 0)} dragging={Boolean(draggingId)} over={overZone === 'lost'} handlers={zoneHandlers('lost')} />
+            <OutcomeDropZone type="won" deals={wonDeals} value={wonDeals.reduce((sum, deal) => sum + deal.value, 0)} dragging={Boolean(draggingId)} over={overZone === 'won'} handlers={zoneHandlers('won')} onOpen={() => setClosedView('won')} />
+            <OutcomeDropZone type="lost" deals={lostDeals} value={lostDeals.reduce((sum, deal) => sum + deal.value, 0)} dragging={Boolean(draggingId)} over={overZone === 'lost'} handlers={zoneHandlers('lost')} onOpen={() => setClosedView('lost')} />
           </div>
         </div>
       ) : <PipelineList deals={filtered} onSelect={(deal) => setSelectedId(deal.id)} onMove={(id, stage) => moveWithUndo(id, stage)} onClose={closeWithUndo} />}
@@ -192,7 +194,7 @@ export function PipelineBoard() {
         </SheetContent>
       </Sheet>
       <NewDealDialog open={newOpen} onOpenChange={setNewOpen} initialStage={newStage} />
-      <NewProjectDialog open={projectOpen} onOpenChange={setProjectOpen} prefill={projectPrefill} />
+      <ClosedDealsSheet zone={closedView} onClose={() => setClosedView(null)} deals={deals} invoices={invoices} onReopen={(id) => { reopenDeal(id); toast.success('Deal reopened'); }} />
     </div>
   );
 }
@@ -207,17 +209,17 @@ function DealCard({ deal, active, dragging, onSelect, onDragStart, onDragEnd, on
   return <article role="button" tabIndex={0} draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onSelect} onKeyDown={(event) => { if (event.key === 'Enter') onSelect(); }} className={cn('group cursor-grab rounded-2xl p-3.5 text-foreground ring-1 ring-foreground/[0.12] backdrop-blur-xl transition-[transform,opacity,background-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:brightness-110 active:cursor-grabbing', stageCardTone(deal.stage), active && 'ring-2 ring-foreground/35', dragging && '-rotate-1 scale-[1.02] opacity-40 shadow-xl')}>
     <div className="flex items-start justify-between gap-2"><span className="text-[9px] font-semibold text-muted-foreground">Closes {shortDate(deal.dueDate)}</span><DropdownMenu><DropdownMenuTrigger asChild><button aria-label={`Options for ${deal.title}`} onClick={(event) => event.stopPropagation()} className="flex size-7 items-center justify-center rounded-full border border-foreground/[0.12] text-muted-foreground transition-colors hover:text-foreground"><Ellipsis className="size-3.5" /></button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48"><DropdownMenuLabel>Move deal</DropdownMenuLabel>{STAGES.filter((stage) => stage !== deal.stage).map((stage) => <DropdownMenuItem key={stage} onSelect={() => onMove(stage)}>{STAGE_META[stage].label}</DropdownMenuItem>)}<DropdownMenuSeparator /><DropdownMenuItem onSelect={() => onClose('won')}><CheckCircle2 />Mark won</DropdownMenuItem><DropdownMenuItem variant="destructive" onSelect={() => onClose('lost')}><XCircle />Mark lost</DropdownMenuItem><DropdownMenuItem variant="destructive" onSelect={() => onDelete()}><Trash2 />Delete deal</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     <h3 className="mt-2 text-sm font-bold">{deal.title}</h3><p className="mt-0.5 text-[10px] text-muted-foreground">{deal.client}</p>
-    <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-base font-bold tabular-nums">{currency(deal.value, true)}</p><p className="mt-0.5 text-[9px] text-muted-foreground">{deal.probability}% probability</p></div><div className="flex items-center"><PersonBadge id={deal.owner} size="sm" /><GripVertical className="ml-1 size-3.5 text-muted-foreground/35 transition-colors group-hover:text-muted-foreground" /></div></div>
+    <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-base font-bold tabular-nums">{currency(deal.value, true)}</p><p className="mt-0.5 text-[9px] text-muted-foreground">{deal.probability}% probability</p></div><div className="flex items-center gap-1"><button type="button" aria-label={`Mark ${deal.title} won`} title="Mark won" onClick={(event) => { event.stopPropagation(); onClose('won'); }} className="flex size-6 items-center justify-center rounded-full bg-lime-300/85 text-lime-950 transition-[opacity,transform] hover:scale-110 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"><CheckCircle2 className="size-3.5" /></button><button type="button" aria-label={`Mark ${deal.title} lost`} title="Mark lost" onClick={(event) => { event.stopPropagation(); onClose('lost'); }} className="flex size-6 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground transition-[opacity,transform] hover:scale-110 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"><XCircle className="size-3.5" /></button><PersonBadge id={deal.owner} size="sm" /><GripVertical className="ml-1 size-3.5 text-muted-foreground/35 transition-colors group-hover:text-muted-foreground" /></div></div>
   </article>;
 }
 
-function OutcomeDropZone({ type, deals, value, dragging, over, handlers }: { type: Zone; deals: Deal[]; value: number; dragging: boolean; over: boolean; handlers: { onDragOver: React.DragEventHandler<HTMLElement>; onDragLeave: React.DragEventHandler<HTMLElement>; onDrop: React.DragEventHandler<HTMLElement> } }) {
+function OutcomeDropZone({ type, deals, value, dragging, over, handlers, onOpen }: { type: Zone; deals: Deal[]; value: number; dragging: boolean; over: boolean; onOpen: () => void; handlers: { onDragOver: React.DragEventHandler<HTMLElement>; onDragLeave: React.DragEventHandler<HTMLElement>; onDrop: React.DragEventHandler<HTMLElement> } }) {
   const won = type === 'won';
-  return <section {...handlers} className={cn('flex min-h-64 flex-col items-center justify-center rounded-[1.5rem] border border-dashed p-3 text-center transition-[transform,border-color,background-color,box-shadow] duration-200', won ? 'border-lime-400/35' : 'border-rose-400/25', dragging && (won ? 'bg-lime-300/[0.06]' : 'bg-rose-400/[0.05]'), over && 'scale-[1.04] border-solid', over && (won ? 'border-lime-300 bg-lime-300/15 shadow-[0_0_44px_-10px_rgba(190,242,100,0.55)]' : 'border-rose-400 bg-rose-400/15 shadow-[0_0_44px_-10px_rgba(251,113,133,0.5)]'))}>
+  return <section {...handlers} role="button" tabIndex={0} aria-label={`Show ${type} deals`} onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter') onOpen(); }} className={cn('flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border border-dashed p-3 text-center transition-[transform,border-color,background-color,box-shadow] duration-200', won ? 'border-lime-400/35' : 'border-rose-400/25', dragging && (won ? 'bg-lime-300/[0.06]' : 'bg-rose-400/[0.05]'), over && 'scale-[1.04] border-solid', over && (won ? 'border-lime-300 bg-lime-300/15 shadow-[0_0_44px_-10px_rgba(190,242,100,0.55)]' : 'border-rose-400 bg-rose-400/15 shadow-[0_0_44px_-10px_rgba(251,113,133,0.5)]'))}>
     <span className={cn('flex size-11 items-center justify-center rounded-full transition-transform duration-300 ease-(--ease-pop)', won ? 'bg-lime-300 text-lime-950' : 'bg-foreground/[0.06] text-muted-foreground', over && 'scale-125', over && !won && 'bg-rose-400 text-white')}>{won ? <Trophy className="size-4" /> : <X className="size-4" />}</span>
     <h3 className="mt-3 text-xs font-bold capitalize">{type}</h3>
     <p className="mt-1 text-[9px] text-muted-foreground"><AnimatedNumber value={deals.length} duration={0.4} /> deals · <AnimatedNumber value={value} format={compact} duration={0.5} /></p>
-    <p className={cn('mt-4 text-[9px] font-semibold text-muted-foreground transition-colors', over && 'text-foreground')}>{over ? `Release to mark ${type}` : `Drop to ${won ? 'win' : 'lose'}`}</p>
+    <p className={cn('mt-4 text-[9px] font-semibold text-muted-foreground transition-colors', over && 'text-foreground')}>{over ? `Release to mark ${type}` : deals.length ? `View ${deals.length} ${type}` : `Drop to ${won ? 'win' : 'lose'}`}</p>
   </section>;
 }
 
@@ -229,3 +231,33 @@ function stageDot(stage: DealStage) { return { lead: 'bg-sky-300', proposal: 'bg
 function stageBorder(stage: DealStage) { return { lead: 'border-sky-300/20', proposal: 'border-lime-300/25', negotiation: 'border-[#ff8f78]/25', won: 'border-stone-300/20' }[stage]; }
 function stageGlow(stage: DealStage) { return { lead: '[--stage-glow:rgba(125,211,252,0.45)]', proposal: '[--stage-glow:rgba(190,242,100,0.45)]', negotiation: '[--stage-glow:rgba(255,143,120,0.45)]', won: '[--stage-glow:rgba(231,229,228,0.4)]' }[stage]; }
 function stageCardTone(stage: DealStage) { return { lead: 'bg-sky-300/15', proposal: 'bg-lime-300/15', negotiation: 'bg-[#ff8f78]/16', won: 'bg-stone-300/15' }[stage]; }
+
+/** Everything already won or lost, with where each win went: its project and its invoice. */
+function ClosedDealsSheet({ zone, onClose, deals, invoices, onReopen }: { zone: Zone | null; onClose: () => void; deals: Deal[]; invoices: Invoice[]; onReopen: (id: string) => void }) {
+  const list = zone ? deals.filter((deal) => deal.outcome === zone) : [];
+  return (
+    <Sheet open={Boolean(zone)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent className="w-[min(92vw,430px)] overflow-y-auto border-foreground/[0.1] bg-popover/95 p-0 sm:max-w-[430px]">
+        <div className="p-5">
+          <SheetHeader className="px-0 pt-1"><SheetTitle className="text-xl font-bold capitalize">{zone} deals</SheetTitle><SheetDescription>{zone === 'won' ? 'Each win started a project and raised an invoice. Follow them from here.' : 'Reopen a deal to put it back on the board.'}</SheetDescription></SheetHeader>
+          <ul className="mt-5 space-y-2.5">
+            {list.length ? list.map((deal) => {
+              const invoice = invoices.find((item) => item.dealId === deal.id);
+              return (
+                <li key={deal.id} className="animate-in rounded-2xl bg-foreground/[0.04] p-4 ring-1 ring-foreground/[0.07] duration-300 fade-in-0 slide-in-from-bottom-1">
+                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold">{deal.title}</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{deal.client} · {deal.kind}</p></div><p className="shrink-0 text-sm font-bold tabular-nums">{currency(deal.value)}</p></div>
+                  <p className="mt-2 text-[10px] text-muted-foreground">Closed {deal.closedAt ? shortDate(deal.closedAt) : '—'}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {zone === 'won' && deal.projectId && <Link href="/dashboard/studio/projects" className="rounded-full bg-lime-300/80 px-2.5 py-1 text-[10px] font-bold text-lime-950 transition-transform hover:scale-105">Project →</Link>}
+                    {zone === 'won' && invoice && <Link href="/dashboard/studio/finance" className={cn('rounded-full px-2.5 py-1 text-[10px] font-bold transition-transform hover:scale-105', invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300')}>{invoice.id} · {invoice.status === 'Paid' ? 'Paid' : 'Payment due'} →</Link>}
+                    {zone === 'lost' && <Button size="xs" variant="outline" className="rounded-full" onClick={() => onReopen(deal.id)}>Reopen deal</Button>}
+                  </div>
+                </li>
+              );
+            }) : <li className="rounded-2xl border border-dashed border-foreground/[0.14] px-4 py-10 text-center text-xs text-muted-foreground">No {zone} deals yet.</li>}
+          </ul>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

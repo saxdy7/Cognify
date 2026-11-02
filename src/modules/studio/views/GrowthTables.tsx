@@ -20,9 +20,9 @@ function NoRows({ children }: { children: React.ReactNode }) {
 }
 
 export function TopCustomersTable() {
-  const { deals, projects } = useStudio();
+  const { deals, invoices, projects } = useStudio();
   const reduce = useReducedMotion();
-  const rows = React.useMemo(() => customerRows(deals, projects), [deals, projects]);
+  const rows = React.useMemo(() => customerRows(deals, invoices, projects), [deals, invoices, projects]);
   const [key, setKey] = React.useState<'revenue' | 'deals'>('revenue');
   const [dir, setDir] = React.useState<'desc' | 'asc'>('desc');
   const sorted = [...rows].sort((a, b) => (dir === 'desc' ? 1 : -1) * (b[key] - a[key])).slice(0, 8);
