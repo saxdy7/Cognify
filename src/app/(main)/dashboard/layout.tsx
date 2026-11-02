@@ -18,18 +18,22 @@ import { WorkspaceContextSidebar } from '@/modules/inspector/WorkspaceContextSid
  */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
-    // Confine touchpad pinch-to-zoom strictly to the infinite canvas surface.
-    // If cursor is on the dock, header, inspector, or other chrome, block browser page zoom.
-    const blockOuterPinchZoom = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        const target = e.target as HTMLElement | null;
-        if (!target?.closest('[data-canvas-surface="true"]')) {
-          e.preventDefault();
-        }
-      }
+    // Never let the browser zoom the page while in the app: pinch / Ctrl+wheel is
+    // swallowed here (bubble phase). The canvas handles it first for its own camera and
+    // stops propagation, so the only thing that can still reach this listener is a pinch
+    // somewhere the canvas isn't listening — which must do nothing rather than zoom the UI.
+    const blockPageZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
     };
-    window.addEventListener('wheel', blockOuterPinchZoom, { passive: false });
-    return () => window.removeEventListener('wheel', blockOuterPinchZoom);
+    const blockGesture = (e: Event) => e.preventDefault(); // Safari trackpad pinch
+    window.addEventListener('wheel', blockPageZoom, { passive: false });
+    document.addEventListener('gesturestart', blockGesture);
+    document.addEventListener('gesturechange', blockGesture);
+    return () => {
+      window.removeEventListener('wheel', blockPageZoom);
+      document.removeEventListener('gesturestart', blockGesture);
+      document.removeEventListener('gesturechange', blockGesture);
+    };
   }, []);
 
   return (

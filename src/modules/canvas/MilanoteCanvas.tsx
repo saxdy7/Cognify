@@ -766,17 +766,24 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
   }, [selectedId, handleDelete, addElement]);
 
   // ─────────────────────────── Smooth Touchpad Pinch, Pan & Multi-Touch Gestures ───────────────────────────
+  // Runs again when `loading` flips: during the "Loading Canvas…" screen neither element
+  // exists, so attaching only on first mount left pinch/pan dead (and the browser zoomed
+  // the whole page instead). `root` also covers the top bar / toolbar / minimap so a pinch
+  // anywhere over the canvas zooms the camera, like Figma.
   useEffect(() => {
+    const root = containerRef.current;
     const surface = surfaceRef.current;
-    if (!surface) return;
+    if (!root || !surface) return;
 
     const onWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement | null;
+      const zooming = e.ctrlKey || e.metaKey || e.altKey;
+      // Plain two-finger scroll only pans when it happens over the surface itself;
+      // over the top bar / menus it keeps its normal behaviour.
+      if (!zooming && !surface.contains(target)) return;
       // Allow internal scrolling inside textareas / code editors only when NOT zooming
-      if (target?.closest('textarea, [contenteditable="true"], .overflow-y-auto')) {
-        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-          return;
-        }
+      if (!zooming && target?.closest('textarea, [contenteditable="true"], .overflow-y-auto')) {
+        return;
       }
 
       // Intercept wheel on canvas to prevent full-page browser scrolling
@@ -821,8 +828,9 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         // Moving 2 fingers horizontally pans left/right (e.deltaX)
         // Moving 2 fingers vertically pans top/down (e.deltaY)
         const currentPan = panRef.current;
-        const nextPanX = currentPan.x - e.deltaX;
-        const nextPanY = currentPan.y - e.deltaY;
+        const horizontal = e.shiftKey && e.deltaX === 0; // mouse wheel + Shift pans sideways
+        const nextPanX = currentPan.x - (horizontal ? e.deltaY : e.deltaX);
+        const nextPanY = currentPan.y - (horizontal ? 0 : e.deltaY);
 
         panRef.current = { x: nextPanX, y: nextPanY };
         setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
@@ -915,22 +923,22 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
       setPan({ x: Math.round(nextPanX), y: Math.round(nextPanY) });
     };
 
-    surface.addEventListener('wheel', onWheel, { passive: false });
+    root.addEventListener('wheel', onWheel, { passive: false });
     surface.addEventListener('touchstart', onTouchStart, { passive: false });
     surface.addEventListener('touchmove', onTouchMove, { passive: false });
     surface.addEventListener('touchend', onTouchEnd);
-    surface.addEventListener('gesturestart', onGestureStart as any);
-    surface.addEventListener('gesturechange', onGestureChange as any);
+    root.addEventListener('gesturestart', onGestureStart as any);
+    root.addEventListener('gesturechange', onGestureChange as any);
 
     return () => {
-      surface.removeEventListener('wheel', onWheel);
+      root.removeEventListener('wheel', onWheel);
       surface.removeEventListener('touchstart', onTouchStart);
       surface.removeEventListener('touchmove', onTouchMove);
       surface.removeEventListener('touchend', onTouchEnd);
-      surface.removeEventListener('gesturestart', onGestureStart as any);
-      surface.removeEventListener('gesturechange', onGestureChange as any);
+      root.removeEventListener('gesturestart', onGestureStart as any);
+      root.removeEventListener('gesturechange', onGestureChange as any);
     };
-  }, []);
+  }, [loading]);
 
   // ─────────────────────────── Pan Surface Mouse Drag ───────────────────────────
   const handleSurfaceMouseDown = useCallback((e: React.MouseEvent) => {
