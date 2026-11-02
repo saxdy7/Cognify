@@ -5,7 +5,8 @@ import {
   Plus, Trash2, Link as LinkIcon,
   ExternalLink, FileText, Download, Palette,
   Image as ImageIcon, Search, ChevronRight, FolderOpen,
-  Pencil, Eraser, Undo2, Code2, ZoomIn, Maximize2, Minimize2
+  Pencil, Eraser, Undo2, Code2, ZoomIn, Maximize2, Minimize2,
+  Columns2, Copy, Check, X
 } from 'lucide-react';
 import { CanvasElement } from '@/types';
 import { toast } from 'sonner';
@@ -131,6 +132,10 @@ function NoteCardContent({
     adjustHeight();
   }, [element.content?.body]);
 
+  const body = element.content?.body || '';
+  const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
   return (
     <div className="flex flex-col h-full select-text pointer-events-auto">
       <input
@@ -138,7 +143,7 @@ function NoteCardContent({
         value={element.content?.title || ''}
         onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
         placeholder="Note Title"
-        className={`w-full bg-transparent font-semibold text-sm outline-none pb-1.5 mb-2 ${
+        className={`w-full bg-transparent font-bold text-sm outline-none pb-1.5 mb-2 ${
           theme === 'dark' 
             ? 'text-zinc-100 border-b border-zinc-700/40 placeholder:text-zinc-600' 
             : 'text-zinc-800 border-b border-zinc-200/60 placeholder:text-zinc-400'
@@ -151,12 +156,116 @@ function NoteCardContent({
           onUpdate(element.id, { content: { ...element.content, body: e.target.value } });
           adjustHeight();
         }}
-        placeholder="Type your notes..."
-        className={`w-full bg-transparent text-xs leading-relaxed outline-none resize-none overflow-y-auto ${
-          theme === 'dark' ? 'text-zinc-300 placeholder:text-zinc-600' : 'text-zinc-600 placeholder:text-zinc-400'
+        placeholder="Type your notes here... (direct form, auto-grows as you type)"
+        className={`w-full bg-transparent text-xs leading-relaxed outline-none resize-none overflow-hidden ${
+          theme === 'dark' ? 'text-zinc-200 placeholder:text-zinc-600' : 'text-zinc-700 placeholder:text-zinc-400'
         }`}
         style={{ minHeight: 120 }}
       />
+      {wordCount > 0 && (
+        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-500/15 text-[10px] text-zinc-400 select-none">
+          <span className="font-mono">{wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}</span>
+          <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold">~{readingTime}m read</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FocusEditorModal({
+  element,
+  theme,
+  onClose,
+  onUpdate,
+}: {
+  element: CanvasElement;
+  theme: string;
+  onClose: () => void;
+  onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const title = element.content?.title || '';
+  const body = element.content?.body || '';
+  const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
+  const charCount = body.length;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
+  const handleCopy = () => {
+    const textToCopy = `${title ? title + '\n\n' : ''}${body}`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    toast.success('Note content copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex flex-col bg-zinc-950/95 text-white backdrop-blur-2xl animate-in fade-in duration-200 select-text"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {/* Top Header */}
+      <div className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-zinc-950/70 backdrop-blur-md shrink-0 select-none">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <span>Direct Form Focus Editor</span>
+          </div>
+          <div className="h-4 w-px bg-white/10" />
+          <span className="text-xs font-mono text-zinc-400">
+            {wordCount.toLocaleString()} words · {charCount.toLocaleString()} chars · ~{readingTime} min read
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? 'Copied' : 'Copy Text'}</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-white/15 bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-all shadow-sm cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Back to Canvas (Esc)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Editor Body */}
+      <div className="flex-1 overflow-y-auto px-6 py-12 flex justify-center">
+        <div className="max-w-3xl w-full flex flex-col gap-6">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => onUpdate(element.id, { content: { ...element.content, title: e.target.value } })}
+            placeholder="Untitled Note"
+            className="w-full bg-transparent text-3xl md:text-4xl font-black font-space-grotesk tracking-tight outline-none placeholder:text-zinc-700 text-white"
+          />
+          <textarea
+            value={body}
+            onChange={(e) => onUpdate(element.id, { content: { ...element.content, body: e.target.value } })}
+            placeholder="Start writing freely in direct form... No limits, no distraction, automatic live saving."
+            className="w-full flex-1 min-h-[500px] bg-transparent text-base md:text-lg leading-relaxed outline-none resize-none placeholder:text-zinc-700 text-zinc-200 font-normal"
+            autoFocus
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -941,10 +1050,10 @@ export const CanvasCard = React.memo(function CanvasCard({
 
       {/* Content */}
       <div className={`relative w-full h-full flex flex-col ${isBorderless ? 'p-0' : 'p-4'}`}>
-        {/* Hover action buttons - zoom, expand, color picker & delete */}
+        {/* Hover/Focus action buttons - zoom, wide mode, expand focus, color picker & delete */}
         {element.type !== 'text' && element.type !== 'column' && activeTool === 'select' && (
           <div className={`absolute top-2 right-2 flex items-center gap-1 z-20 transition-opacity duration-150 ${
-            isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            isHovered || isSelected ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
             {onZoomTo && (
               <button
@@ -952,7 +1061,7 @@ export const CanvasCard = React.memo(function CanvasCard({
                 className={`p-1 rounded-md transition-colors ${
                   theme === 'dark' ? 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white' : 'bg-white/90 hover:bg-white text-zinc-600 hover:text-zinc-900 shadow-sm'
                 }`}
-                title="Zoom camera to this container"
+                title="Zoom camera directly to this container"
               >
                 <ZoomIn className="w-3 h-3" />
               </button>
@@ -962,10 +1071,27 @@ export const CanvasCard = React.memo(function CanvasCard({
               className={`p-1 rounded-md transition-colors ${
                 theme === 'dark' ? 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white' : 'bg-white/90 hover:bg-white text-zinc-600 hover:text-zinc-900 shadow-sm'
               }`}
-              title="Expand to Fullscreen Focus Editor"
+              title="Open Direct Form Focus Editor (Fullscreen)"
             >
               <Maximize2 className="w-3 h-3" />
             </button>
+            {element.type === 'note' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const isWide = (element.width || 320) >= 540;
+                  onUpdate(element.id, { width: isWide ? 320 : 620 });
+                }}
+                className={`p-1 rounded-md transition-colors ${
+                  (element.width || 320) >= 540
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                    : theme === 'dark' ? 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white' : 'bg-white/90 hover:bg-white text-zinc-600 hover:text-zinc-900 shadow-sm'
+                }`}
+                title={(element.width || 320) >= 540 ? "Switch to Standard Width (320px)" : "Switch to Direct Form Wide (620px)"}
+              >
+                <Columns2 className="w-3 h-3" />
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); setShowColorPicker(!showColorPicker); }}
               className={`p-1 rounded-md transition-colors ${
@@ -1029,6 +1155,15 @@ export const CanvasCard = React.memo(function CanvasCard({
           </div>
         )}
       </div>
+
+      {isExpandedModal && (
+        <FocusEditorModal
+          element={element}
+          theme={theme}
+          onClose={() => setIsExpandedModal(false)}
+          onUpdate={onUpdate}
+        />
+      )}
     </div>
   );
 });

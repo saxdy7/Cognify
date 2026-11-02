@@ -66,7 +66,7 @@ export function NotePage({ noteId }: { noteId: string }) {
   };
 
   return (
-    <div className={cn('mx-auto w-full space-y-8 p-6 pb-32 md:p-8', isDatabase ? 'max-w-[1400px]' : 'max-w-3xl xl:max-w-[calc(48rem+324px)] xl:pr-[324px]')}>
+    <div className={cn('mx-auto w-full space-y-8 p-6 pb-32 md:p-8', isDatabase ? 'max-w-[1400px]' : 'max-w-3xl')}>
       {/* Title row */}
       <div className="flex items-start gap-4">
         <Popover>

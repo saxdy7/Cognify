@@ -1,13 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Next.js 16 proxy (formerly middleware): refreshes the Supabase session cookie
+// Next.js 16 proxy: refreshes the Supabase session cookie
 // and gates the authenticated app shell.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request,
   })
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -29,9 +27,7 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
+            request,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
@@ -47,7 +43,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // Redirect to dashboard if logged in and trying to access login/landing (optional)
+    // Redirect to dashboard if logged in and trying to access login/register
     if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }

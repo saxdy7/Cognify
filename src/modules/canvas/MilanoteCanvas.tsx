@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowLeft, Moon, Sun, Loader2, Maximize, Minimize, Plus, Minus,
-  Spline, LayoutGrid, Upload, Trash2,
+  Spline, LayoutGrid, Upload, Trash2, Scan, Map, ChevronDown,
 } from 'lucide-react';
 import { CanvasBoard, CanvasElement, CanvasConnector } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -43,6 +43,115 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; color: s
   gauge: { width: 220, height: 270, color: '#FFFFFF', content: { label: 'Metric', value: 60, max: 100, unit: '%' } },
 };
 
+function CanvasMiniMap({
+  elements,
+  pan,
+  zoom,
+  surfaceRect,
+  onPanTo,
+  dark,
+}: {
+  elements: CanvasElement[];
+  pan: { x: number; y: number };
+  zoom: number;
+  surfaceRect: DOMRect | null;
+  onPanTo: (x: number, y: number) => void;
+  dark: boolean;
+}) {
+  if (!surfaceRect || elements.length === 0) return null;
+
+  const viewportWorldLeft = -pan.x / zoom;
+  const viewportWorldTop = -pan.y / zoom;
+  const viewportWorldRight = (surfaceRect.width - pan.x) / zoom;
+  const viewportWorldBottom = (surfaceRect.height - pan.y) / zoom;
+
+  let minX = viewportWorldLeft;
+  let minY = viewportWorldTop;
+  let maxX = viewportWorldRight;
+  let maxY = viewportWorldBottom;
+
+  for (const el of elements) {
+    minX = Math.min(minX, el.x);
+    minY = Math.min(minY, el.y);
+    maxX = Math.max(maxX, el.x + (el.width || 280));
+    maxY = Math.max(maxY, el.y + (el.height || 180));
+  }
+
+  const pad = 300;
+  minX -= pad;
+  minY -= pad;
+  maxX += pad;
+  maxY += pad;
+
+  const worldWidth = Math.max(100, maxX - minX);
+  const worldHeight = Math.max(100, maxY - minY);
+
+  const mapWidth = 160;
+  const mapHeight = 100;
+  const scale = Math.min(mapWidth / worldWidth, mapHeight / worldHeight);
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickMapX = e.clientX - rect.left;
+    const clickMapY = e.clientY - rect.top;
+
+    const targetWorldX = minX + clickMapX / scale;
+    const targetWorldY = minY + clickMapY / scale;
+
+    const newPanX = Math.round(surfaceRect.width / 2 - targetWorldX * zoom);
+    const newPanY = Math.round(surfaceRect.height / 2 - targetWorldY * zoom);
+    onPanTo(newPanX, newPanY);
+  };
+
+  const viewRectX = (viewportWorldLeft - minX) * scale;
+  const viewRectY = (viewportWorldTop - minY) * scale;
+  const viewRectW = Math.max(10, (surfaceRect.width / zoom) * scale);
+  const viewRectH = Math.max(8, (surfaceRect.height / zoom) * scale);
+
+  return (
+    <div
+      onClick={handleClick}
+      className={`relative w-[160px] h-[100px] rounded-xl border overflow-hidden shadow-2xl cursor-pointer transition-colors backdrop-blur-xl ${
+        dark ? 'bg-zinc-950/85 border-white/10 hover:border-white/25' : 'bg-white/85 border-zinc-300 hover:border-zinc-400'
+      }`}
+      title="Mini-map: Click anywhere to jump camera"
+    >
+      {/* Element thumbnails */}
+      {elements.map((el) => {
+        const x = (el.x - minX) * scale;
+        const y = (el.y - minY) * scale;
+        const w = Math.max(2, (el.width || 280) * scale);
+        const h = Math.max(2, (el.height || 180) * scale);
+        return (
+          <div
+            key={el.id}
+            className="absolute rounded-[1px] pointer-events-none"
+            style={{
+              left: `${x}px`,
+              top: `${y}px`,
+              width: `${w}px`,
+              height: `${h}px`,
+              backgroundColor: el.color || (dark ? '#71717a' : '#a1a1aa'),
+              opacity: 0.85,
+            }}
+          />
+        );
+      })}
+
+      {/* Viewport frame indicator */}
+      <div
+        className="absolute border-2 border-orange-500 bg-orange-500/15 rounded-[2px] pointer-events-none shadow-xs"
+        style={{
+          left: `${viewRectX}px`,
+          top: `${viewRectY}px`,
+          width: `${viewRectW}px`,
+          height: `${viewRectH}px`,
+        }}
+      />
+    </div>
+  );
+}
+
 export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme, headerActions }: MilanoteCanvasProps) {
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [connectors, setConnectors] = useState<CanvasConnector[]>([]);
@@ -60,6 +169,8 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showZoomMenu, setShowZoomMenu] = useState(false);
+  const [showMiniMap, setShowMiniMap] = useState(true);
 
   // Space-drag pan support
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -633,6 +744,9 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
       } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
         e.preventDefault();
         resetView();
+      } else if ((e.shiftKey || e.ctrlKey || e.metaKey) && (e.key === '1' || e.code === 'Digit1' || e.key === '!')) {
+        e.preventDefault();
+        zoomToFit();
       }
     };
 
@@ -915,6 +1029,52 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     setPan({ x: 0, y: 0 });
   };
 
+  const zoomToFit = useCallback(() => {
+    if (elements.length === 0) {
+      resetView();
+      return;
+    }
+    const rect = surfaceRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const el of elements) {
+      const w = el.width || 300;
+      const h = el.height || 200;
+      minX = Math.min(minX, el.x);
+      minY = Math.min(minY, el.y);
+      maxX = Math.max(maxX, el.x + w);
+      maxY = Math.max(maxY, el.y + h);
+    }
+
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    const padding = 100;
+
+    const availableWidth = Math.max(100, rect.width - padding * 2);
+    const availableHeight = Math.max(100, rect.height - padding * 2);
+
+    const fitScaleX = availableWidth / Math.max(contentWidth, 100);
+    const fitScaleY = availableHeight / Math.max(contentHeight, 100);
+    const targetZoom = Math.min(Math.max(Math.min(fitScaleX, fitScaleY), 0.15), 1.5);
+
+    const contentCenterX = minX + contentWidth / 2;
+    const contentCenterY = minY + contentHeight / 2;
+
+    const targetPanX = Math.round(rect.width / 2 - contentCenterX * targetZoom);
+    const targetPanY = Math.round(rect.height / 2 - contentCenterY * targetZoom);
+
+    triggerSmoothZoom();
+    zoomRef.current = targetZoom;
+    panRef.current = { x: targetPanX, y: targetPanY };
+    setZoom(targetZoom);
+    setPan({ x: targetPanX, y: targetPanY });
+  }, [elements, triggerSmoothZoom]);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) containerRef.current?.requestFullscreen().catch(() => {});
     else document.exitFullscreen().catch(() => {});
@@ -981,34 +1141,106 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
             </div>
           )}
 
-          {/* Zoom controls: fully visible with distinct buttons [- 100% +] */}
-          <div className={`flex items-center gap-1.5 px-2 py-1 border rounded-xl shadow-xs select-none ${dark ? 'bg-zinc-900/90 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
-            <button
-              onClick={() => zoomBy(0.9)}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ${dark ? 'bg-zinc-800/80 hover:bg-zinc-700 border-white/10 text-white shadow-xs' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-900 shadow-xs'}`}
-              title="Zoom out (-)"
-              aria-label="Zoom out"
-            >
-              <Minus className="w-3.5 h-3.5 stroke-[2.75]" />
-            </button>
-            <button
-              onClick={resetView}
-              className={`px-2 py-0.5 text-xs font-black tabular-nums min-w-[50px] text-center rounded-md transition-colors cursor-pointer ${dark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-100 text-zinc-900'}`}
-              title="Reset zoom to 100%"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              onClick={() => zoomBy(1.1)}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ${dark ? 'bg-zinc-800/80 hover:bg-zinc-700 border-white/10 text-white shadow-xs' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-900 shadow-xs'}`}
-              title="Zoom in (+)"
-              aria-label="Zoom in"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.75]" />
-            </button>
+          {/* Zoom controls: fully visible with distinct buttons [- 100% +], Fit & Presets */}
+          <div className="relative">
+            <div className={`flex items-center gap-1 px-1.5 py-1 border rounded-xl shadow-xs select-none ${dark ? 'bg-zinc-900/90 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
+              <button
+                onClick={() => zoomBy(0.85)}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ${dark ? 'bg-zinc-800/80 hover:bg-zinc-700 border-white/10 text-white shadow-xs' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-900 shadow-xs'}`}
+                title="Zoom out (-)"
+                aria-label="Zoom out"
+              >
+                <Minus className="w-3.5 h-3.5 stroke-[2.75]" />
+              </button>
+              <button
+                onClick={() => setShowZoomMenu(!showZoomMenu)}
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs font-black tabular-nums min-w-[56px] text-center rounded-md transition-colors cursor-pointer ${dark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-100 text-zinc-900'}`}
+                title="Zoom presets and options"
+              >
+                <span>{Math.round(zoom * 100)}%</span>
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </button>
+              <button
+                onClick={() => zoomBy(1.15)}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ${dark ? 'bg-zinc-800/80 hover:bg-zinc-700 border-white/10 text-white shadow-xs' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-900 shadow-xs'}`}
+                title="Zoom in (+)"
+                aria-label="Zoom in"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.75]" />
+              </button>
+              <div className={`h-4 w-px mx-0.5 ${dark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+              <button
+                onClick={zoomToFit}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${dark ? 'hover:bg-white/10 text-zinc-300 hover:text-white' : 'hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900'}`}
+                title="Fit all cards to screen (Shift + 1)"
+              >
+                <Scan className="w-3.5 h-3.5 text-orange-400" />
+                <span className="hidden sm:inline">Fit</span>
+              </button>
+            </div>
+
+            {/* Zoom presets dropdown */}
+            {showZoomMenu && (
+              <div className={`absolute top-full mt-2 left-0 w-44 rounded-xl border shadow-2xl p-1 z-[160] animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${
+                dark ? 'bg-zinc-900/95 border-white/10 text-zinc-200' : 'bg-white/95 border-zinc-200 text-zinc-800'
+              }`}>
+                <button
+                  onClick={() => { zoomToFit(); setShowZoomMenu(false); }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-orange-500/15 hover:text-orange-400 transition-colors text-left cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5"><Scan className="w-3.5 h-3.5" /> Fit All Cards</span>
+                  <kbd className="text-[10px] font-mono opacity-60">Shift+1</kbd>
+                </button>
+                <div className={`h-px my-1 ${dark ? 'bg-white/10' : 'bg-zinc-200'}`} />
+                {[
+                  { label: '50%', value: 0.5 },
+                  { label: '100% (Default)', value: 1.0 },
+                  { label: '150%', value: 1.5 },
+                  { label: '200%', value: 2.0 },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      triggerSmoothZoom();
+                      zoomRef.current = item.value;
+                      setZoom(item.value);
+                      setShowZoomMenu(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors text-left cursor-pointer ${
+                      Math.round(zoom * 100) === Math.round(item.value * 100)
+                        ? 'bg-orange-500/20 text-orange-400 font-bold'
+                        : dark ? 'hover:bg-white/10' : 'hover:bg-zinc-100'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+                <div className={`h-px my-1 ${dark ? 'bg-white/10' : 'bg-zinc-200'}`} />
+                <button
+                  onClick={() => { resetView(); setShowZoomMenu(false); }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-white/10 transition-colors text-left cursor-pointer"
+                >
+                  <span>Reset Camera</span>
+                  <kbd className="text-[10px] font-mono opacity-60">Ctrl+0</kbd>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className={`h-4 w-px ${dark ? 'bg-zinc-800' : 'bg-zinc-300'}`} />
+
+          {/* Mini-map toggle */}
+          <button
+            onClick={() => setShowMiniMap(!showMiniMap)}
+            className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 cursor-pointer ${
+              showMiniMap
+                ? 'bg-orange-500/15 border-orange-500/30 text-orange-400'
+                : dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'
+            }`}
+            title={showMiniMap ? "Hide Mini-map" : "Show Mini-map"}
+          >
+            <Map className="w-3.5 h-3.5" />
+          </button>
 
           <button onClick={toggleFullscreen} className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-[background-color,transform] active:scale-95 cursor-pointer ${dark ? 'bg-zinc-900/80 hover:bg-zinc-800 border-white/10 text-white' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-800 shadow-sm'}`} title="Fullscreen">
             {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
@@ -1024,6 +1256,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         {/* Infinite surface */}
         <div
           ref={surfaceRef}
+          data-canvas-surface="true"
           onMouseDown={handleSurfaceMouseDown}
           onMouseMove={(e) => {
             const canvasPos = screenToCanvas(e.clientX, e.clientY);
@@ -1234,6 +1467,24 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
               >
                 Exit
               </button>
+            </div>
+          )}
+
+          {/* Interactive Mini-map (Bottom Right) */}
+          {showMiniMap && elements.length > 0 && (
+            <div className="absolute bottom-20 right-6 z-[130] animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <CanvasMiniMap
+                elements={elements}
+                pan={pan}
+                zoom={zoom}
+                surfaceRect={surfaceRef.current?.getBoundingClientRect() || null}
+                onPanTo={(x, y) => {
+                  triggerSmoothZoom();
+                  panRef.current = { x, y };
+                  setPan({ x, y });
+                }}
+                dark={dark}
+              />
             </div>
           )}
 

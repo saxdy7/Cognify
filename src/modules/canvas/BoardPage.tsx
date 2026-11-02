@@ -28,7 +28,7 @@ export function BoardPage({ boardId }: { boardId: string }) {
   // The canvas has its own light/dark toggle — drive it from (and write back to) the app theme.
   const canvasTheme: 'light' | 'dark' = resolvedTheme === 'light' ? 'light' : 'dark';
 
-  if (loading) return <div className="p-4 md:p-6"><CanvasSkeleton /></div>;
+  if (loading) return <div className="w-full h-full"><CanvasSkeleton /></div>;
 
   if (!board || !user) {
     return (
@@ -48,44 +48,40 @@ export function BoardPage({ boardId }: { boardId: string }) {
   }
 
   return (
-    <div className="p-3 md:p-4">
-      <div className="relative h-[calc(100vh-5.5rem)] overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
-
-
-        {shareOpen && (
-          <ShareDialog
-            resource={{ type: 'board', id: board.id, title: board.name }}
-            isOwner={board.user_id === user.id}
-            onClose={() => setShareOpen(false)}
-            onLeft={() => router.push('/dashboard/canvas')}
-          />
-        )}
-        <MilanoteCanvas
-          board={board}
-          userId={user.id}
-          onBackToBoards={() => router.push('/dashboard/canvas')}
-          theme={canvasTheme}
-          setTheme={(t) => setTheme(t)}
-          headerActions={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShareOpen(true)}
-              className="h-9 px-3.5 rounded-xl border font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <Users className="w-3.5 h-3.5 text-rose-500" />
-              <span>{board.user_id === user.id ? 'Share' : 'Shared'}</span>
-            </Button>
-          }
+    <div className="relative w-full h-full flex flex-col flex-1 overflow-hidden select-none">
+      {shareOpen && (
+        <ShareDialog
+          resource={{ type: 'board', id: board.id, title: board.name }}
+          isOwner={board.user_id === user.id}
+          onClose={() => setShareOpen(false)}
+          onLeft={() => router.push('/dashboard/canvas')}
         />
-      </div>
+      )}
+      <MilanoteCanvas
+        board={board}
+        userId={user.id}
+        onBackToBoards={() => router.push('/dashboard/canvas')}
+        theme={canvasTheme}
+        setTheme={(t) => setTheme(t)}
+        headerActions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShareOpen(true)}
+            className="h-9 px-3.5 rounded-xl border font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 shadow-xs cursor-pointer"
+          >
+            <Users className="w-3.5 h-3.5 text-rose-500" />
+            <span>{board.user_id === user.id ? 'Share' : 'Shared'}</span>
+          </Button>
+        }
+      />
     </div>
   );
 }
 
 function CanvasSkeleton() {
   return (
-    <div className="relative h-[calc(100vh-5.5rem)] overflow-hidden rounded-xl border">
+    <div className="relative w-full h-full overflow-hidden">
       <Skeleton className="absolute inset-0 rounded-none" />
       <div className="absolute top-4 left-4 flex gap-2">
         <Skeleton className="h-9 w-24" /><Skeleton className="h-9 w-9" /><Skeleton className="h-9 w-9" />
