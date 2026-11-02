@@ -9,6 +9,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/modules/main/PageHeader';
+import { Stagger, StaggerItem } from '@/components/motion/reveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,12 +97,12 @@ export function DocsPage() {
           ))}
         </div>
       ) : list.length ? (
-        <div className="divide-y overflow-hidden rounded-lg border bg-card">
+        <Stagger className="divide-y divide-foreground/[0.06] overflow-hidden rounded-2xl border bg-card backdrop-blur-xl" gap={0.04}>
           {list.map((n) => {
             const isOwner = n.user_id === user?.id;
             const isDb = (n.content as { kind?: string } | null)?.kind === 'database';
             return (
-              <div key={n.id} className="group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/40">
+              <StaggerItem key={n.id} className="group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-foreground/[0.04]">
                 <Link href={`/dashboard/docs/${n.id}`} className="absolute inset-0" aria-label={n.title || 'Untitled'} />
                 <span className="w-6 text-center text-lg leading-none">{n.icon || (isDb ? '🗃️' : '📄')}</span>
                 <div className="min-w-0 flex-1">
@@ -132,11 +133,11 @@ export function DocsPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-                <ArrowRight className="size-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-docs" />
-              </div>
+                <ArrowRight className="size-4 text-muted-foreground/40 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-docs" />
+              </StaggerItem>
             );
           })}
-        </div>
+        </Stagger>
       ) : (
         <Empty className="border border-dashed">
           <EmptyHeader>

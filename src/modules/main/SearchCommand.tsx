@@ -24,18 +24,23 @@ import { Kbd, KbdGroup } from '@/components/ui/kbd';
 export function SearchTrigger() {
   const { setCommandOpen } = useShell();
   return (
-    <Button
-      variant="outline"
-      onClick={() => setCommandOpen(true)}
-      className="hidden h-8 w-full max-w-sm justify-start gap-2 bg-muted/40 pr-1.5 text-muted-foreground shadow-none md:flex"
-    >
-      <Search className="size-4" />
-      <span className="flex-1 truncate text-left text-sm font-normal">Search links, boards, pages…</span>
-      <KbdGroup>
-        <Kbd>⌘</Kbd>
-        <Kbd>K</Kbd>
-      </KbdGroup>
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        onClick={() => setCommandOpen(true)}
+        className="hidden h-8 w-56 justify-start gap-2 rounded-full bg-foreground/[0.05] pr-1.5 text-muted-foreground shadow-none hover:bg-foreground/[0.09] lg:flex"
+      >
+        <Search className="size-4" />
+        <span className="flex-1 truncate text-left text-sm font-normal">Search everything…</span>
+        <KbdGroup>
+          <Kbd>⌘</Kbd>
+          <Kbd>K</Kbd>
+        </KbdGroup>
+      </Button>
+      <Button variant="ghost" size="icon" aria-label="Search" onClick={() => setCommandOpen(true)} className="rounded-full lg:hidden">
+        <Search className="size-4" />
+      </Button>
+    </>
   );
 }
 

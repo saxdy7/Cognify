@@ -68,8 +68,8 @@ export const LandingFeatures = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -10, scale: 1.02 }}
+              transition={{ delay: index * 0.1, duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+              whileHover={{ y: -10, scale: 1.02, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } }}
               className="p-10 rounded-[2.5rem] bg-zinc-900/40 backdrop-blur-3xl border border-white/5 hover:border-orange-500/30 transition-all group overflow-hidden relative"
             >
               <div className="flex items-center gap-8">

@@ -6,6 +6,17 @@
 > This file is written to be read by people *and* by AI coding agents. Rules are phrased as
 > constraints. When in doubt: **quieter, smaller, fewer.**
 
+> **v2 skin (Nov 2026, local only — not deployed).** The dashboard now follows the Solvik /
+> Murmura references and **supersedes** these rules where they conflict: floating pill nav
+> (`TopNav`) + dark tool dock (`FloatingDock`) replace the sidebar/header; the page ground is a
+> pastel mesh (`.app-ui` in `globals.css`); cards are frosted (`--card` is translucent under
+> `.app-ui`); tint tiles (`bg-tint-lime|coral|sky|ink`) are allowed for stat/board cards; UI face
+> is Urbanist (set in `(main)/layout.tsx`); motion is allowed in the dashboard via
+> `components/motion/reveal.tsx` (`Stagger`, `CountUp`, `Magnetic`, `Lift`) and `lib/motion.ts`
+> (house ease `cubic-bezier(.2,.8,.2,1)`, pop ease `back.out`-style) plus the CSS `.page-enter`
+> blur-focus route transition. Token names are unchanged. Rules below about colour restraint,
+> skeleton/empty states, page anatomy and accessibility still apply.
+
 ---
 
 ## 1. Philosophy

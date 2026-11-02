@@ -16,9 +16,14 @@ export const LandingNavbar = () => {
   });
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-4' : 'py-8'}`}>
-      <div className="max-w-7xl mx-auto px-6">
-        <div className={`relative flex items-center justify-between px-8 py-4 rounded-3xl transition-all duration-500 ${scrolled ? 'bg-black/80 dark:bg-black/80 backdrop-blur-2xl shadow-2xl border border-white/10' : 'bg-transparent'}`}>
+    <motion.nav
+      initial={{ opacity: 0, y: -24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-3' : 'py-6'}`}
+    >
+      <div className="max-w-5xl mx-auto px-4">
+        <div className={`relative flex items-center justify-between pl-4 pr-2 py-2 rounded-full transition-all duration-500 border ${scrolled ? 'bg-black/70 backdrop-blur-2xl shadow-2xl border-white/10' : 'bg-white/[0.04] backdrop-blur-xl border-white/[0.08]'}`}>
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/15 shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_30px_rgba(255,107,0,0.6)] flex items-center justify-center">
               <img src="/logo-mark.png" alt="Cognify" className="w-full h-full object-cover scale-105" />
@@ -26,7 +31,7 @@ export const LandingNavbar = () => {
             <span className="text-xl font-black font-space-grotesk tracking-tight text-white">Cognify</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-10">
+          <div className="hidden md:flex items-center gap-9">
             {['Features', 'Testimonials', 'FAQ'].map((item) => (
               <Link
                 key={item}
@@ -98,6 +103,6 @@ export const LandingNavbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
+    </motion.nav>
   );
 };

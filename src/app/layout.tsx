@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, Urbanist } from "next/font/google";
 import "./globals.css";
 import "tldraw/tldraw.css";
 // Liveblocks default styles (+ dark theme keyed off the `dark` class on <html>)
@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-heading" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
+// App-shell face (dashboard only — see (main)/layout.tsx). Marketing keeps Geist/Space Grotesk.
+const urbanist = Urbanist({ subsets: ["latin"], variable: "--font-urbanist", weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
   title: {
@@ -34,10 +36,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(geist.variable, spaceGrotesk.variable, geistMono.variable, "min-h-screen antialiased")}>
+      <body className={cn(geist.variable, spaceGrotesk.variable, geistMono.variable, urbanist.variable, "min-h-screen antialiased")}>
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-          <Toaster position="top-right" richColors closeButton />
+          <Toaster position="bottom-center" />
         </ThemeProvider>
       </body>
     </html>

@@ -7,7 +7,8 @@ import { Layers, Loader2, MoreHorizontal, Plus, Search, SortAsc, SortDesc, Trash
 import type { CanvasBoard } from '@/types';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { timeAgo } from '@/lib/format';
-import { gradientFor } from '@/lib/static';
+import { tintFor } from '@/lib/static';
+import { Lift, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { cn } from '@/lib/utils';
 import { PageHeader, SectionHeader } from '@/modules/main/PageHeader';
 import { TemplateGallery } from '@/modules/canvas/TemplateGallery';
@@ -65,22 +66,26 @@ export function CanvasBoardsPage() {
 
       <section className="space-y-4">
         <SectionHeader title={<>Your boards <span className="text-sm font-normal text-muted-foreground">({list.length})</span></>} />
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="flex h-[180px] items-center justify-center rounded-xl border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors hover:border-canvas/60 hover:bg-canvas/5 hover:text-foreground"
-          >
-            <Plus className="mr-2 size-4" /> Create new board
-          </button>
+        <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" gap={0.06}>
+          <StaggerItem variant="pop">
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="group flex h-[180px] w-full items-center justify-center rounded-3xl border-2 border-dashed border-foreground/15 text-sm font-semibold text-muted-foreground transition-colors duration-300 hover:border-canvas/60 hover:bg-canvas/5 hover:text-foreground"
+            >
+              <Plus className="mr-2 size-4 transition-transform duration-300 ease-(--ease-pop) group-hover:rotate-90" /> Create new board
+            </button>
+          </StaggerItem>
 
           {loading
-            ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[180px] rounded-xl" />)
+            ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[180px] rounded-3xl" />)
             : list.map((b, i) => (
-                <Card key={b.id} className={cn('group relative h-[180px] overflow-hidden bg-linear-to-br p-0 transition-transform hover:scale-[1.02]', gradientFor(i))}>
+                <StaggerItem key={b.id} variant="pop">
+                <Lift>
+                <Card className={cn('group relative h-[180px] overflow-hidden rounded-3xl border-0 p-0 ring-0', tintFor(i + 1))}>
                   <Link href={`/dashboard/canvas/${b.id}`} className="absolute inset-0" aria-label={`Open ${b.name}`} />
-                  <CardHeader className="flex-row items-start justify-between p-4">
+                  <CardHeader className="flex-row items-start justify-between p-5">
                     <div className="min-w-0">
-                      <h3 className="truncate text-base font-semibold">{b.name}</h3>
+                      <h3 className="truncate text-lg font-bold">{b.name}</h3>
                       {b.user_id !== user?.id && (
                         <Badge variant="secondary" className="mt-1 gap-1 text-[10px]"><Users className="size-3" />Shared with you</Badge>
                       )}
@@ -100,14 +105,15 @@ export function CanvasBoardsPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </CardHeader>
-                  <div className="pointer-events-none absolute top-1/2 left-1/2 size-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/40 blur-2xl dark:bg-white/10" />
-                  <CardFooter className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-white/20 bg-black/5 px-4 py-2.5 text-[11px] font-medium text-foreground/70 backdrop-blur-xs dark:bg-white/5">
+                  <CardFooter className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-current/10 bg-current/5 px-5 py-3 text-[11px] font-semibold opacity-80">
                     <span>Edited {timeAgo(b.updated_at)}</span>
                     <Layers className="size-3.5" />
                   </CardFooter>
                 </Card>
+                </Lift>
+                </StaggerItem>
               ))}
-        </div>
+        </Stagger>
         {!loading && boards.length > 0 && list.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">No boards match “{query}”.</p>
         )}

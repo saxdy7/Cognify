@@ -131,7 +131,7 @@ export function NoteEditor({ noteId, content, onSave }: NoteEditorProps) {
   return (
     <div className="relative">
       {/* Toolbar */}
-      <div className="sticky top-14 z-10 mb-6 flex flex-wrap items-center gap-0.5 rounded-lg border bg-background/90 p-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      <div className="sticky top-2 z-10 mb-6 flex flex-wrap items-center gap-0.5 rounded-2xl border bg-background/90 p-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         {!canWrite && (
           <span className="mr-1 rounded-md bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">View only</span>
         )}

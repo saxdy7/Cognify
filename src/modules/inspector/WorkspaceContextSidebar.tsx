@@ -158,7 +158,7 @@ export function WorkspaceContextSidebar() {
   return (
     <aside
       aria-label="Workspace Inspector"
-      className="relative z-20 flex h-full w-80 shrink-0 flex-col border-l border-sidebar-border bg-sidebar/70 backdrop-blur-2xl transition-all duration-300 dark:bg-zinc-950/90 select-none overflow-hidden"
+      className="inspector-in relative z-20 mr-3 mb-3 flex w-80 shrink-0 flex-col self-stretch overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/[0.07] backdrop-blur-2xl select-none"
     >
       {/* ── Header Tabs & Controls ── */}
       <div className="flex h-12 items-center justify-between border-b border-sidebar-border px-3 shrink-0">

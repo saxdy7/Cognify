@@ -90,6 +90,16 @@ export const CARD_GRADIENTS = [
 
 export const gradientFor = (index: number) => CARD_GRADIENTS[index % CARD_GRADIENTS.length];
 
+/** Solid tint surfaces (lime / coral / sky / ink) — tokens in globals.css, swap per theme. */
+export const TINT_CARDS = [
+  'bg-tint-lime text-tint-lime-foreground',
+  'bg-tint-coral text-tint-coral-foreground',
+  'bg-tint-sky text-tint-sky-foreground',
+  'bg-tint-ink text-tint-ink-foreground',
+] as const;
+
+export const tintFor = (index: number) => TINT_CARDS[index % TINT_CARDS.length];
+
 /** Emoji choices for doc page icons. */
 export const PAGE_ICONS = [
   '📄', '📝', '📌', '💡', '🚀', '📊', '🎯', '🔖', '⭐', '🧠', '📚', '🗂️',

@@ -8,6 +8,8 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { isToday } from '@/lib/format';
 import { BOOKMARK_FILTERS, type BookmarkFilter } from '@/lib/static';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+import { InViewItem } from '@/components/motion/reveal';
 import { PageHeader } from '@/modules/main/PageHeader';
 import { BookmarkCard } from '@/modules/bookmarks/BookmarkCard';
 import { CreateSpaceDialog, EditLinkDialog, SaveLinkDialog } from '@/modules/bookmarks/BookmarkDialogs';
@@ -136,17 +138,24 @@ export function BookmarksPage() {
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 border-b pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1 rounded-md border bg-muted p-1">
+        <div className="flex items-center gap-1 rounded-full border bg-muted p-1">
           {BOOKMARK_FILTERS.map((f) => (
             <button
               key={f.id}
               onClick={() => setParam('filter', f.id === 'all' ? null : f.id)}
               className={cn(
-                'rounded-sm px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
-                filter === f.id && 'bg-background text-foreground shadow-sm',
+                'relative rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
+                filter === f.id && 'text-foreground',
               )}
             >
-              {f.label}
+              {filter === f.id && (
+                <motion.span
+                  layoutId="bookmark-filter"
+                  className="absolute inset-0 rounded-full bg-background shadow-sm"
+                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                />
+              )}
+              <span className="relative">{f.label}</span>
             </button>
           ))}
         </div>
@@ -168,18 +177,19 @@ export function BookmarksPage() {
           {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className={view === 'grid' ? 'h-[300px] rounded-xl' : 'h-14 rounded-lg'} />)}
         </div>
       ) : filtered.length ? (
-        <div className={view === 'grid' ? 'grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'flex flex-col gap-2'}>
-          {filtered.map((b) => (
-            <BookmarkCard
-              key={b.id}
-              bookmark={b}
-              view={view}
-              spaceName={b.container_id ? spaceName[b.container_id] : undefined}
-              onEdit={setEditing}
-              onDelete={setDeleting}
-              onToggleFavorite={toggleFavorite}
-              onToggleShortcut={toggleShortcut}
-            />
+        <div className={view === 'grid' ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'flex flex-col gap-2'}>
+          {filtered.map((b, i) => (
+            <InViewItem key={b.id} index={i} whileHover={{ y: -4, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } }}>
+              <BookmarkCard
+                bookmark={b}
+                view={view}
+                spaceName={b.container_id ? spaceName[b.container_id] : undefined}
+                onEdit={setEditing}
+                onDelete={setDeleting}
+                onToggleFavorite={toggleFavorite}
+                onToggleShortcut={toggleShortcut}
+              />
+            </InViewItem>
           ))}
         </div>
       ) : (

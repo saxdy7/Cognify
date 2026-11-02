@@ -48,7 +48,7 @@ export function BoardPage({ boardId }: { boardId: string }) {
   }
 
   return (
-    <div className="relative w-full h-full flex flex-col flex-1 overflow-hidden select-none">
+    <div className="relative mx-3 mt-1 mb-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-3xl shadow-[0_24px_60px_-24px_rgba(10,14,12,0.35)] ring-1 ring-foreground/10 select-none">
       {shareOpen && (
         <ShareDialog
           resource={{ type: 'board', id: board.id, title: board.name }}
