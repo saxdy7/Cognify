@@ -13,8 +13,23 @@ const META_KEY = 'cognify:studio-meta:v1';
 export type SyncStatus = 'loading' | 'saving' | 'synced' | 'local' | 'setup';
 const TABLE_MISSING = (error: { code?: string } | null) => error?.code === 'PGRST205' || error?.code === '42P01';
 const normalize = (raw: Partial<StudioData> | null | undefined): StudioData => { const base = emptyStudioData(); return { ...base, ...(raw ?? {}), team: raw?.team?.length ? raw.team : base.team }; };
-const readMeta = (): { dirty?: boolean } => { try { return JSON.parse(window.localStorage.getItem(META_KEY) ?? '{}'); } catch { return {}; } };
-const writeMeta = (meta: { dirty: boolean }) => { try { window.localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* storage unavailable */ } };
+const readMeta = (): { dirty?: boolean; synced?: boolean } => { try { return JSON.parse(window.localStorage.getItem(META_KEY) ?? '{}'); } catch { return {}; } };
+const writeMeta = (meta: { dirty: boolean; synced?: boolean }) => { try { window.localStorage.setItem(META_KEY, JSON.stringify({ synced: readMeta().synced, ...meta })); } catch { /* storage unavailable */ } };
+
+/** Union by id: nothing on either side is ever dropped when a device meets the account for the first time. */
+function mergeStudio(remote: StudioData, local: StudioData): StudioData {
+  const union = <T extends { id: string }>(a: T[], b: T[]) => { const seen = new Set(a.map((item) => item.id)); return [...a, ...b.filter((item) => !seen.has(item.id))]; };
+  return {
+    team: union(remote.team, local.team),
+    expenses: union(remote.expenses, local.expenses),
+    deals: union(remote.deals, local.deals),
+    tasks: union(remote.tasks, local.tasks),
+    projects: union(remote.projects, local.projects),
+    invoices: union(remote.invoices, local.invoices),
+    deliverables: union(remote.deliverables, local.deliverables),
+  };
+}
+const hasContent = (data: StudioData) => data.deals.length + data.tasks.length + data.projects.length + data.invoices.length + data.expenses.length + data.deliverables.length + data.team.length - 1 > 0;
 /** Earlier builds shipped sample data under these keys; they are wiped, never migrated. */
 const OLD_STORAGE_KEYS = ['cognify:studio-data:v4-studio', 'cognify:studio-data:v3-calendar', 'cognify:studio-data:v2-inr'];
 
@@ -70,7 +85,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     const { data: row, error } = await supabase.from('studio_data').upsert({ user_id: userId.current, data: next }, { onConflict: 'user_id' }).select('updated_at').single();
     if (error) { setSync(TABLE_MISSING(error) ? 'setup' : 'local'); return; }
     remoteStamp.current = row.updated_at;
-    if (edits.current === version) { writeMeta({ dirty: false }); setSync('synced'); }
+    if (edits.current === version) { writeMeta({ dirty: false, synced: true }); setSync('synced'); }
   }, []);
 
   // 1) show this device's copy instantly, 2) reconcile with the database.
@@ -96,11 +111,22 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         if (error) { setSync(TABLE_MISSING(error) ? 'setup' : 'local'); return; }
         const remote = row && row.data && Object.keys(row.data).length ? normalize(row.data as Partial<StudioData>) : null;
-        if (remote && !(readMeta().dirty && local)) {
+        const meta = readMeta();
+        if (remote && local && hasContent(local) && !meta.synced) {
+          // First time this device meets an account that already has data: keep both sides.
+          remoteStamp.current = row!.updated_at;
+          const merged = mergeStudio(remote, local);
+          skipPush.current = true;
+          setData(merged);
+          ready.current = true;
+          await push(merged);
+          return;
+        }
+        if (remote && !(meta.dirty && local)) {
           remoteStamp.current = row!.updated_at;
           skipPush.current = true;
           setData(remote);
-          writeMeta({ dirty: false });
+          writeMeta({ dirty: false, synced: true });
           setSync('synced');
         } else {
           // First run (or unsynced edits made offline): this device's data goes up to the account.
@@ -139,7 +165,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         remoteStamp.current = row.updated_at;
         skipPush.current = true;
         setData(normalize(row.data as Partial<StudioData>));
-        writeMeta({ dirty: false });
+        writeMeta({ dirty: false, synced: true });
       }
     };
     document.addEventListener('visibilitychange', onVisible);
