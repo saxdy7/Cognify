@@ -73,6 +73,7 @@ export function WorkspaceContextSidebar() {
 
   const isBookmarksWorkspace = pathname.startsWith('/dashboard/bookmarks');
   const isDocsIndex = pathname === '/dashboard/docs';
+  const isStudioWorkspace = pathname.startsWith('/dashboard/studio');
 
   // ── Document Metrics ──
   const docMetrics = useMemo(() => {
@@ -130,6 +131,8 @@ export function WorkspaceContextSidebar() {
   const handlePrint = () => {
     window.print();
   };
+
+  if (isStudioWorkspace) return null;
 
   if (!inspectorOpen) {
     return (

@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Bell, Bookmark, Clock, FileText, Layers, PanelRight, Plus, Settings, Sparkles } from 'lucide-react';
+import { Bell, Bookmark, BriefcaseBusiness, Clock, FileText, Layers, PanelRight, Plus, Settings, Sparkles } from 'lucide-react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
@@ -71,6 +71,7 @@ export function FloatingDock() {
           <DropdownMenuItem onSelect={newPage}><FileText />New page</DropdownMenuItem>
           <DropdownMenuItem onSelect={newBoard}><Layers />New board</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => router.push('/dashboard/bookmarks?new=1')}><Bookmark />Save link</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push('/dashboard/studio/pipeline')}><BriefcaseBusiness />New client deal</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       </Magnetic>

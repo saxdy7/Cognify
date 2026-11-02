@@ -1,6 +1,7 @@
 import {
   Bookmark,
   Bell,
+  BriefcaseBusiness,
   FileText,
   LayoutDashboard,
   Layers,
@@ -10,7 +11,7 @@ import {
 
 // ─── App navigation ────────────────────────────────────────────────────────────
 
-export type Workspace = 'bookmarks' | 'canvas' | 'docs';
+export type Workspace = 'bookmarks' | 'canvas' | 'docs' | 'studio';
 
 export interface NavItem {
   title: string;
@@ -27,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: 'Bookmarks', url: '/dashboard/bookmarks', icon: Bookmark, accent: 'brand', nested: true },
   { title: 'Canvas', url: '/dashboard/canvas', icon: Layers, accent: 'canvas', nested: true },
   { title: 'Docs', url: '/dashboard/docs', icon: FileText, accent: 'docs', nested: true },
+  { title: 'Studio', url: '/dashboard/studio', icon: BriefcaseBusiness, accent: 'brand', nested: true },
 ];
 
 export const SECONDARY_NAV_ITEMS: NavItem[] = [

@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <WorkspaceProvider>
       <LiveblocksProviders>
         <ShellProvider>
-          <div className="app-ui relative flex h-svh flex-col overflow-hidden text-foreground" style={{ overscrollBehavior: 'none' }}>
+          <div data-lenis-prevent className="app-ui relative flex h-svh flex-col overflow-hidden text-foreground" style={{ overscrollBehavior: 'none' }}>
             <TopNav />
             <FloatingDock />
             <div className="relative flex min-h-0 flex-1 overflow-hidden md:pl-[calc(var(--dock-x)*2+var(--dock-w))]">

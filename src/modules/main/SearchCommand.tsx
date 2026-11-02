@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bookmark, FileText, Layers, Plus, Search, Sparkles, Bell, Settings, LayoutDashboard } from 'lucide-react';
+import { Bookmark, BriefcaseBusiness, FileText, Layers, Plus, Search, Sparkles, Bell, Settings, LayoutDashboard } from 'lucide-react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { hostnameOf } from '@/lib/format';
 import { useShell } from '@/modules/main/ShellProvider';
@@ -77,6 +77,7 @@ export function SearchCommand() {
           <CommandItem onSelect={() => go('/dashboard/bookmarks')}><Bookmark />Bookmarks</CommandItem>
           <CommandItem onSelect={() => go('/dashboard/canvas')}><Layers />Canvas</CommandItem>
           <CommandItem onSelect={() => go('/dashboard/docs')}><FileText />Docs</CommandItem>
+          <CommandItem onSelect={() => go('/dashboard/studio')}><BriefcaseBusiness />Client studio</CommandItem>
           <CommandItem onSelect={() => go('/dashboard/inbox')}><Bell />Inbox</CommandItem>
           <CommandItem onSelect={() => go('/dashboard/settings')}><Settings />Settings</CommandItem>
         </CommandGroup>
@@ -88,6 +89,7 @@ export function SearchCommand() {
           <CommandItem onSelect={() => go('/dashboard/bookmarks?new=1')}><Plus />Save a link</CommandItem>
           <CommandItem onSelect={() => run(async () => { const n = await addNote(null, 'page'); if (n) router.push(`/dashboard/docs/${n.id}`); })}><Plus />New page</CommandItem>
           <CommandItem onSelect={() => run(async () => { const b = await addBoard('Untitled board'); if (b) router.push(`/dashboard/canvas/${b.id}`); })}><Plus />New board</CommandItem>
+          <CommandItem onSelect={() => go('/dashboard/studio/pipeline')}><Plus />New client deal</CommandItem>
         </CommandGroup>
 
         {notes.length > 0 && (
