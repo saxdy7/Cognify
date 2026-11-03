@@ -64,7 +64,7 @@ function ClearStudio({ inMenu = false }: { inMenu?: boolean }) {
     <AlertDialog>
       <AlertDialogTrigger asChild>{inMenu ? <Button variant="ghost" size="sm" className="mt-3 w-full justify-start rounded-xl text-destructive sm:hidden"><Trash2 />Clear all Studio data</Button> : <Button variant="ghost" size="icon" className="hidden shrink-0 rounded-xl sm:inline-flex" title="Clear all Studio data" aria-label="Clear all Studio data"><Trash2 className="size-4" /></Button>}</AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogHeader><AlertDialogTitle>Clear all Studio data?</AlertDialogTitle><AlertDialogDescription>This removes every deal, project, task, invoice, expense and teammate saved in this browser. It cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogHeader><AlertDialogTitle>Delete all Studio data?</AlertDialogTitle><AlertDialogDescription>This permanently removes every deal, project, task, invoice, expense and teammate from this device and your synced account. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
         <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={clearStudio} className="bg-destructive text-white">Clear everything</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

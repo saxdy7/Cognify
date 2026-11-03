@@ -42,10 +42,11 @@ export function NewDealDialog({ open, onOpenChange, initialStage = 'lead' }: { o
   const [owner, setOwner] = React.useState('');
   const [source, setSource] = React.useState<string>('Referral');
   const [dueDate, setDueDate] = React.useState(() => addDaysISO(todayISO(), 14));
-
-  React.useEffect(() => {
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) { setStage(initialStage); setDueDate(addDaysISO(todayISO(), 14)); }
-  }, [initialStage, open]);
+  }
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -90,11 +91,12 @@ export function NewTaskDialog({ open, onOpenChange, initialDate }: { open: boole
   const [reminderMinutes, setReminderMinutes] = React.useState('30');
   const [notes, setNotes] = React.useState('');
   const [moreOpen, setMoreOpen] = React.useState(false);
-
-  React.useEffect(() => {
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) setDate(initialDate);
     else setMoreOpen(false);
-  }, [initialDate, open]);
+  }
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -146,12 +148,14 @@ export function NewProjectDialog({ open, onOpenChange, prefill }: { open: boolea
   const [owner, setOwner] = React.useState('');
   const [contact, setContact] = React.useState('');
   const [dueDate, setDueDate] = React.useState(() => addDaysISO(todayISO(), 30));
-
-  React.useEffect(() => {
-    if (!open) return;
-    setDueDate(addDaysISO(todayISO(), 30));
-    if (prefill) { setTitle(prefill.title); setClient(prefill.client); setKind(prefill.kind); setBudget(String(prefill.budget)); setOwner(prefill.owner); }
-  }, [open, prefill]);
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setDueDate(addDaysISO(todayISO(), 30));
+      if (prefill) { setTitle(prefill.title); setClient(prefill.client); setKind(prefill.kind); setBudget(String(prefill.budget)); setOwner(prefill.owner); }
+    }
+  }
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -192,8 +196,11 @@ export function NewInvoiceDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [issuedAt, setIssuedAt] = React.useState(todayISO);
   const [dueAt, setDueAt] = React.useState(() => addDaysISO(todayISO(), 14));
   const [status, setStatus] = React.useState<Invoice['status']>('Due');
-
-  React.useEffect(() => { if (open) { setIssuedAt(todayISO()); setDueAt(addDaysISO(todayISO(), 14)); } }, [open]);
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) { setIssuedAt(todayISO()); setDueAt(addDaysISO(todayISO(), 14)); }
+  }
   const projectOptions = projects.filter((item) => !client || item.client.toLowerCase() === client.toLowerCase()).map((item) => item.title);
 
   const submit = (event: React.FormEvent) => {
@@ -228,8 +235,11 @@ export function NewExpenseDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [label, setLabel] = React.useState('');
   const [amount, setAmount] = React.useState('');
   const [date, setDate] = React.useState(todayISO);
-
-  React.useEffect(() => { if (open) setDate(todayISO()); }, [open]);
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setDate(todayISO());
+  }
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();

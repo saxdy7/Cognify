@@ -26,8 +26,6 @@ const compact = (n: number) => currency(n, true);
 export function PipelineBoard() {
   const { deals, invoices, team, placeDeal, closeDeal, reopenDeal, updateDeal, deleteDeal } = useStudio();
   const [closedView, setClosedView] = React.useState<Zone | null>(null);
-  // Mirrors draggingId synchronously so a drop never races the React state update.
-  const draggingRef = React.useRef<string | null>(null);
   const reduce = useReducedMotion();
   const [newOpen, setNewOpen] = React.useState(false);
   const [newStage, setNewStage] = React.useState<DealStage>('lead');
@@ -52,7 +50,7 @@ export function PipelineBoard() {
   const closingValue = closingThisMonth.reduce((sum, deal) => sum + deal.value, 0);
 
   const openNewDeal = (stage: DealStage = 'lead') => { setNewStage(stage); setNewOpen(true); };
-  const resetDrag = () => { draggingRef.current = null; setDraggingId(null); setOverStage(null); setOverBefore(null); setOverZone(null); };
+  const resetDrag = () => { setDraggingId(null); setOverStage(null); setOverBefore(null); setOverZone(null); };
 
   /** The deal that follows `id` inside its own stage — used to put a card back exactly where it was. */
   const nextSibling = (id: string) => {
@@ -121,10 +119,10 @@ export function PipelineBoard() {
   };
 
   const zoneHandlers = (zone: Zone) => ({
-    onDragEnter: (event: React.DragEvent<HTMLElement>) => { if (draggingRef.current) event.preventDefault(); },
-    onDragOver: (event: React.DragEvent<HTMLElement>) => { if (!draggingRef.current) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (overZone !== zone) { setOverZone(zone); setOverStage(null); setOverBefore(null); } },
+    onDragEnter: (event: React.DragEvent<HTMLElement>) => { if (draggingId || event.dataTransfer.types.includes('text/plain')) event.preventDefault(); },
+    onDragOver: (event: React.DragEvent<HTMLElement>) => { if (!draggingId && !event.dataTransfer.types.includes('text/plain')) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (overZone !== zone) { setOverZone(zone); setOverStage(null); setOverBefore(null); } },
     onDragLeave: (event: React.DragEvent<HTMLElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOverZone(null); },
-    onDrop: (event: React.DragEvent<HTMLElement>) => { event.preventDefault(); const id = draggingRef.current ?? draggingId ?? event.dataTransfer.getData('text/plain'); resetDrag(); if (id) closeWithUndo(id, zone); },
+    onDrop: (event: React.DragEvent<HTMLElement>) => { event.preventDefault(); const id = draggingId ?? event.dataTransfer.getData('text/plain'); resetDrag(); if (id) closeWithUndo(id, zone); },
   });
 
   return (
@@ -170,7 +168,7 @@ export function PipelineBoard() {
                       ...stageDeals.flatMap((deal) => [
                         ...(isOver && overBefore === deal.id && deal.id !== draggingId ? [dropGap(`gap-${deal.id}`)] : []),
                         <motion.div key={deal.id} data-deal-id={deal.id} layout={!reduce} initial={reduce ? false : { opacity: 0, scale: 0.94, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduce ? undefined : { opacity: 0, scale: 0.92 }} transition={{ type: 'spring', stiffness: 460, damping: 36, mass: 0.7 }}>
-                          <DealCard deal={deal} active={selectedId === deal.id} dragging={draggingId === deal.id} onSelect={() => setSelectedId(deal.id)} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', deal.id); draggingRef.current = deal.id; setDraggingId(deal.id); }} onDragEnd={resetDrag} onMove={(nextStage) => moveWithUndo(deal.id, nextStage)} onClose={(outcome) => closeWithUndo(deal.id, outcome)} onDelete={() => { deleteDeal(deal.id); toast.success("Deal deleted"); }} />
+                          <DealCard deal={deal} active={selectedId === deal.id} dragging={draggingId === deal.id} onSelect={() => setSelectedId(deal.id)} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', deal.id); setDraggingId(deal.id); }} onDragEnd={resetDrag} onMove={(nextStage) => moveWithUndo(deal.id, nextStage)} onClose={(outcome) => closeWithUndo(deal.id, outcome)} onDelete={() => { deleteDeal(deal.id); toast.success("Deal deleted"); }} />
                         </motion.div>,
                       ]),
                       ...(isOver && overBefore === null ? [dropGap('gap-end')] : []),

@@ -230,7 +230,7 @@ export function AnimatedNumber({
   const counted = React.useRef(false);
   const reduce = useReducedMotion();
   const formatRef = React.useRef(format);
-  formatRef.current = format;
+  React.useEffect(() => { formatRef.current = format; }, [format]);
 
   React.useEffect(() => {
     const el = ref.current;

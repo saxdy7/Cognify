@@ -54,7 +54,7 @@ function CanvasMiniMap({
   elements: CanvasElement[];
   pan: { x: number; y: number };
   zoom: number;
-  surfaceRect: DOMRect | null;
+  surfaceRect: { width: number; height: number } | null;
   onPanTo: (x: number, y: number) => void;
   dark: boolean;
 }) {
@@ -183,6 +183,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const viewportActionsRef = useRef<{ zoomBy: (factor: number) => void; resetView: () => void; zoomToFit: () => void } | null>(null);
   useEffect(() => { panRef.current = pan; }, [pan]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
@@ -194,6 +195,18 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
   }, []);
   const containerRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const [surfaceSize, setSurfaceSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setSurfaceSize((current) => current?.width === width && current.height === height ? current : { width, height });
+    });
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, [loading]);
 
   const [smoothZoom, setSmoothZoom] = useState(false);
   const smoothZoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -739,14 +752,14 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
         else if (k === 'p' || k === 'l') setActiveTool(t => (t === 'connect' ? 'select' : 'connect'));
         else if (k === 'c') addElement('note', { content: { title: 'Comment', body: '' }, color: '#DBEAFE' });
         else if (k === 'd') addElement('sketch');
-        else if (e.key === '+' || e.key === '=') zoomBy(1.15);
-        else if (e.key === '-' || e.key === '_') zoomBy(0.85);
+        else if (e.key === '+' || e.key === '=') viewportActionsRef.current?.zoomBy(1.15);
+        else if (e.key === '-' || e.key === '_') viewportActionsRef.current?.zoomBy(0.85);
       } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
         e.preventDefault();
-        resetView();
+        viewportActionsRef.current?.resetView();
       } else if ((e.shiftKey || e.ctrlKey || e.metaKey) && (e.key === '1' || e.code === 'Digit1' || e.key === '!')) {
         e.preventDefault();
-        zoomToFit();
+        viewportActionsRef.current?.zoomToFit();
       }
     };
 
@@ -979,7 +992,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     window.addEventListener('mouseup', onUp);
   }, [connectSourceId, activeTool]);
 
-  const zoomBy = (factor: number) => {
+  const zoomBy = useCallback((factor: number) => {
     triggerSmoothZoom();
     const rect = surfaceRef.current?.getBoundingClientRect();
     const cx = rect ? rect.width / 2 : 400;
@@ -996,7 +1009,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
       });
       return next;
     });
-  };
+  }, [triggerSmoothZoom]);
 
 
   const zoomToElement = (elementId: string) => {
@@ -1029,13 +1042,13 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     setSelectedId(elementId);
   };
 
-  const resetView = () => {
+  const resetView = useCallback(() => {
     triggerSmoothZoom();
     zoomRef.current = 1;
     panRef.current = { x: 0, y: 0 };
     setZoom(1);
     setPan({ x: 0, y: 0 });
-  };
+  }, [triggerSmoothZoom]);
 
   const zoomToFit = useCallback(() => {
     if (elements.length === 0) {
@@ -1081,7 +1094,12 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
     panRef.current = { x: targetPanX, y: targetPanY };
     setZoom(targetZoom);
     setPan({ x: targetPanX, y: targetPanY });
-  }, [elements, triggerSmoothZoom]);
+  }, [elements, resetView, triggerSmoothZoom]);
+
+  useEffect(() => {
+    viewportActionsRef.current = { zoomBy, resetView, zoomToFit };
+    return () => { viewportActionsRef.current = null; };
+  }, [zoomBy, resetView, zoomToFit]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) containerRef.current?.requestFullscreen().catch(() => {});
@@ -1485,7 +1503,7 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
                 elements={elements}
                 pan={pan}
                 zoom={zoom}
-                surfaceRect={surfaceRef.current?.getBoundingClientRect() || null}
+                surfaceRect={surfaceSize}
                 onPanTo={(x, y) => {
                   triggerSmoothZoom();
                   panRef.current = { x, y };

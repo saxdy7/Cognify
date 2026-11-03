@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { ArrowLeft, FolderPlus, Link as LinkIcon, Loader2, Sparkles } from 'lucide-react';
 import type { Bookmark, Container } from '@/types';
@@ -126,10 +126,16 @@ export function SaveLinkDialog({ open, onOpenChange, containers, defaultContaine
   const [busy, setBusy] = useState(false);
   const [meta, setMeta] = useState<AnalyzeResult>({});
   const [form, setForm] = useState<DetailsFormValue>({ title: '', description: '', category: '', container_id: defaultContainerId ?? null, tags: [] });
-
-  useEffect(() => {
-    if (!open) { setUrl(''); setStep('url'); setMeta({}); setForm({ title: '', description: '', category: '', container_id: defaultContainerId ?? null, tags: [] }); }
-  }, [open, defaultContainerId]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setUrl('');
+      setStep('url');
+      setMeta({});
+      setForm({ title: '', description: '', category: '', container_id: defaultContainerId ?? null, tags: [] });
+    }
+  }
 
   const normalizedUrl = () => (/^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
 
@@ -202,6 +208,16 @@ export function SaveLinkDialog({ open, onOpenChange, containers, defaultContaine
 
 // ─── Edit link ────────────────────────────────────────────────────────────────
 
+function detailsFromBookmark(bookmark: Bookmark | null): DetailsFormValue {
+  return {
+    title: bookmark?.title ?? '',
+    description: bookmark?.description ?? '',
+    category: bookmark?.category ?? '',
+    container_id: bookmark?.container_id ?? null,
+    tags: bookmark?.tags ?? [],
+  };
+}
+
 export function EditLinkDialog({ bookmark, containers, onOpenChange, onSave }: {
   bookmark: Bookmark | null;
   containers: Container[];
@@ -209,19 +225,13 @@ export function EditLinkDialog({ bookmark, containers, onOpenChange, onSave }: {
   onSave: (id: string, patch: BookmarkPatch) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState<DetailsFormValue>({ title: '', description: '', category: '', container_id: null, tags: [] });
-
-  useEffect(() => {
-    if (bookmark) {
-      setForm({
-        title: bookmark.title ?? '',
-        description: bookmark.description ?? '',
-        category: bookmark.category ?? '',
-        container_id: bookmark.container_id ?? null,
-        tags: bookmark.tags ?? [],
-      });
-    }
-  }, [bookmark]);
+  const bookmarkId = bookmark?.id ?? null;
+  const [loadedBookmarkId, setLoadedBookmarkId] = useState(bookmarkId);
+  const [form, setForm] = useState<DetailsFormValue>(() => detailsFromBookmark(bookmark));
+  if (bookmarkId !== loadedBookmarkId) {
+    setLoadedBookmarkId(bookmarkId);
+    setForm(detailsFromBookmark(bookmark));
+  }
 
   const save = async () => {
     if (!bookmark) return;
@@ -264,7 +274,11 @@ export function CreateSpaceDialog({ open, onOpenChange, onCreate }: {
 }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!open) setName(''); }, [open]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setName('');
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

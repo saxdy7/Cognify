@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -28,16 +28,6 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (modeParam === 'signup') setMode('signup');
-    else setMode('login');
-  }, [modeParam]);
 
   const switchMode = (next: 'login' | 'signup') => {
     setMode(next);
@@ -69,16 +59,12 @@ function LoginForm() {
         if (error) throw error;
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to sign in');
     } finally {
       setLoading(false);
     }
   };
-
-  if (!mounted) {
-    return <Loader2 className="size-10 animate-spin text-muted-foreground" />;
-  }
 
   return (
     <div className="w-full max-w-md">
