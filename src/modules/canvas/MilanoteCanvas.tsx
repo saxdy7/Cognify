@@ -332,6 +332,17 @@ export function MilanoteCanvas({ board, onBackToBoards, userId, theme, setTheme,
           setConnectors(prev => prev.filter(c => c.id !== oldId));
         }
       })
+      // Sent by the agent endpoint right after it writes (Claude Code → canvas). Works even when
+      // table realtime is not enabled in Supabase; only cards we do not have yet are added.
+      .on('broadcast', { event: 'agent-refresh' }, async () => {
+        const { data } = await supabase.from('canvas_elements').select('*').eq('board_id', board.id);
+        if (!mounted || !data) return;
+        setElements(prev => {
+          const have = new Set(prev.map(e => e.id));
+          const fresh = (data as CanvasElement[]).filter(e => !have.has(e.id));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
+      })
       .subscribe();
 
     return () => {
